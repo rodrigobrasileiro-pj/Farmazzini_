@@ -1,0 +1,15 @@
+[theme]
+# Cor Primária: O Vermelho forte da logo
+primaryColor = "#C61322"
+
+# Cor de Fundo Principal: Branco puro
+backgroundColor = "#FFFFFF"
+
+# Cor de Fundo Secundária: O cinza clarinho do fundo da sua barra lateral (perfeito para logo transparente)
+secondaryBackgroundColor = "#EBF0F4"
+
+# Cor do Texto: Preto sólido
+textColor = "#000000"
+
+# Fonte do texto: Mantém um visual moderno e corporativo
+font = "sans serif"
