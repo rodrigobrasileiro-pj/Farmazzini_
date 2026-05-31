@@ -135,11 +135,14 @@ if user_prompt := st.chat_input("Digite sua dúvida estratégica aqui..."):
                     if 'chunk' in event:
                         chunk_bytes = event['chunk']['bytes']
                         full_response += chunk_bytes.decode('utf-8')
-                        response_placeholder.write(full_response + "▌")
+                        # O segredo: escapamos o R$ trocando por R\$ na hora de exibir
+                        texto_seguro = full_response.replace("R$", "R\\$")
+                        response_placeholder.write(texto_seguro + "▌")
                         time.sleep(0.01)
                 
-                response_placeholder.write(full_response)
-                st.session_state.messages.append({"role": "assistant", "content": full_response})
-                
+                # Salvamos a resposta segura no histórico
+                texto_seguro_final = full_response.replace("R$", "R\\$")
+                response_placeholder.write(texto_seguro_final)
+                st.session_state.messages.append({"role": "assistant", "content": texto_seguro_final})
             except Exception as e:
                 response_placeholder.error(f"⚠️ O sistema está temporariamente indisponível. Por favor, tente novamente em breve.")
