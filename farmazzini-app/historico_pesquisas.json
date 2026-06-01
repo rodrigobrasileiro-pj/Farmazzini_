@@ -1,5 +1,25 @@
 [
     {
+        "session_id": "d067b5d7-a67e-4afe-844b-afdba34efdaf",
+        "titulo": "Qual o preço médio do Omeprazol na Vera Cruz?",
+        "data": "2026-06-01T14:10:33.469058",
+        "messages": [
+            {
+                "role": "assistant",
+                "content": "Histórico limpo! **Vacinini** pronto para uma nova consulta."
+            },
+            {
+                "role": "user",
+                "content": "Qual o preço médio do Omeprazol na Vera Cruz?"
+            },
+            {
+                "role": "assistant",
+                "content": "O preço médio do Omeprazol na Vera Cruz é de R\\$ 7,53.",
+                "pergunta": "Qual o preço médio do Omeprazol na Vera Cruz?"
+            }
+        ]
+    },
+    {
         "pergunta": "cade a barra lateral?",
         "data": "2026-06-01T02:53:16.327929"
     },
