@@ -29,3 +29,5 @@ htmlcov/
 .ipynb_checkpoints/
 
 credenciais.json
+
+lambda_scraper_package
