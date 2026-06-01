@@ -248,11 +248,22 @@ with st.sidebar:
         st.caption("Nenhuma pesquisa recente.")
     else:
         for sessao in historico_atual:
-            texto_botao = sessao['titulo'] if len(sessao['titulo']) < 28 else sessao['titulo'][:25] + "..."
-            # Quando clica no histórico, ele CARREGA a conversa inteira salva!
-            if st.button(f"💬 {texto_botao}", key=sessao['session_id']):
-                st.session_state.session_id = sessao['session_id']
-                st.session_state.messages = desserializar_mensagens(sessao['messages'])
+            # BLOCO CORRIGIDO: Tratamento de compatibilidade com histórico antigo
+            titulo_sessao = sessao.get('titulo', sessao.get('pergunta', 'Sessão Antiga'))
+            texto_botao = titulo_sessao if len(titulo_sessao) < 28 else titulo_sessao[:25] + "..."
+            chave_botao = sessao.get('data', str(uuid.uuid4()))
+            
+            if st.button(f"💬 {texto_botao}", key=chave_botao):
+                st.session_state.session_id = sessao.get('session_id', str(uuid.uuid4()))
+                
+                if 'messages' in sessao:
+                    st.session_state.messages = desserializar_mensagens(sessao['messages'])
+                else:
+                    # Fallback caso clique num item guardado com a versão antiga do código
+                    st.session_state.messages = [
+                        {"role": "assistant", "content": "A recuperar formato de pesquisa antiga..."},
+                        {"role": "user", "content": titulo_sessao}
+                    ]
                 st.rerun()
 
 # --- CORPO PRINCIPAL ---
