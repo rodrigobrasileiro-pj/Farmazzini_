@@ -5,6 +5,7 @@ import uuid
 import time
 import re
 import json
+import base64
 import pandas as pd
 import plotly.express as px
 from datetime import datetime, timedelta
@@ -37,81 +38,140 @@ else:
 st.set_page_config(
     page_title="Central de Inteligência Farmazzini",
     page_icon=img_mascote if img_mascote else "💊",
-    layout="wide", # Alterado para 'wide' para aproveitar melhor o ecrã com os gráficos
+    layout="wide",
     initial_sidebar_state="expanded"
 )
+
+# --- TELA DE CARREGAMENTO (SPLASH SCREEN) ---
+def renderizar_splash_screen():
+    if "splash_mostrada" not in st.session_state:
+        # Converter imagem para Base64 para exibir no HTML
+        img_b64 = ""
+        try:
+            with open(caminho_mascote, "rb") as f:
+                img_b64 = base64.b64encode(f.read()).decode()
+        except: pass
+
+        img_html = f'<img src="data:image/png;base64,{img_b64}" width="250" style="margin-bottom: 20px;">' if img_b64 else '<h1>💊 Farmazzini</h1>'
+
+        splash_html = f"""
+        <style>
+        #splash-screen {{
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background-color: white; z-index: 999999;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            animation: fadeOut 0.5s ease 2.5s forwards;
+        }}
+        @keyframes fadeOut {{
+            to {{ opacity: 0; visibility: hidden; z-index: -1; }}
+        }}
+        .loading-bar-container {{
+            width: 300px; height: 8px; background-color: #f0f0f0; border-radius: 4px; overflow: hidden;
+            box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
+        }}
+        .loading-bar {{
+            height: 100%; background-color: #d90429; width: 0%;
+            animation: loadProgress 2s ease-in-out forwards;
+        }}
+        @keyframes loadProgress {{
+            0% {{ width: 0%; }}
+            50% {{ width: 70%; }}
+            100% {{ width: 100%; }}
+        }}
+        /* Oculta a barra nativa do Streamlit enquanto carrega */
+        [data-testid="stAppViewBlockContainer"] {{ animation: delayShow 2.5s; }}
+        @keyframes delayShow {{ from {{ opacity: 0; }} to {{ opacity: 1; }} }}
+        </style>
+        <div id="splash-screen">
+            {img_html}
+            <div style="font-family: sans-serif; color: #555; margin-bottom: 15px; font-weight: bold; letter-spacing: 1px;">
+                INICIALIZANDO CENTRAL DE INTELIGÊNCIA...
+            </div>
+            <div class="loading-bar-container"><div class="loading-bar"></div></div>
+        </div>
+        """
+        st.markdown(splash_html, unsafe_allow_html=True)
+        st.session_state.splash_mostrada = True
+
+# Chama a tela de carregamento logo no início
+renderizar_splash_screen()
 
 # --- CSS CUSTOMIZADO (DESIGN PROFISSIONAL) ---
 st.markdown("""
     <style>
-    /* Ocultar elementos padrão do Streamlit */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
-    header {visibility: hidden;}
     
-    /* Estilizar botões da barra lateral (estilo abas do Gemini) */
     [data-testid="stSidebar"] .stButton>button {
-        width: 100%;
-        border-radius: 8px;
-        text-align: left;
-        border: 1px solid transparent;
-        background-color: transparent;
-        color: #333;
-        padding: 10px 15px;
-        justify-content: flex-start;
-        transition: all 0.2s ease-in-out;
+        width: 100%; border-radius: 8px; text-align: left; border: 1px solid transparent;
+        background-color: transparent; color: #333; padding: 10px 15px;
+        justify-content: flex-start; transition: all 0.2s ease-in-out;
     }
     [data-testid="stSidebar"] .stButton>button:hover {
-        background-color: #f0f2f6;
-        border: 1px solid #e0e0e0;
-        color: #004b23; /* Verde escuro profissional */
+        background-color: #f0f2f6; border: 1px solid #d90429; color: #d90429;
     }
     
-    /* Caixa de destaque principal */
     .highlight-box {
-        background-color: #f8f9fa;
-        padding: 20px;
-        border-radius: 12px;
-        border-left: 5px solid #004b23;
-        margin-bottom: 25px;
+        background-color: #f8f9fa; padding: 20px; border-radius: 12px;
+        border-left: 5px solid #d90429; margin-bottom: 25px;
         box-shadow: 0 2px 4px rgba(0,0,0,0.05);
     }
     </style>
     """, unsafe_allow_html=True)
 
-# --- FUNÇÕES DE HISTÓRICO (30 DIAS) ---
+# --- FUNÇÕES DE HISTÓRICO COM MEMÓRIA COMPLETA (SESSÕES) ---
+def serializar_mensagens(mensagens):
+    msgs_salvas = []
+    for m in mensagens:
+        nova_m = {"role": m["role"], "content": m["content"]}
+        if "pergunta" in m: nova_m["pergunta"] = m["pergunta"]
+        if "dataframe" in m and m["dataframe"] is not None:
+            nova_m["dataframe"] = m["dataframe"].fillna("").to_dict(orient="records")
+        msgs_salvas.append(nova_m)
+    return msgs_salvas
+
+def desserializar_mensagens(mensagens_salvas):
+    msgs = []
+    for m in mensagens_salvas:
+        nova_m = {"role": m["role"], "content": m["content"]}
+        if "pergunta" in m: nova_m["pergunta"] = m["pergunta"]
+        if "dataframe" in m and m["dataframe"]:
+            nova_m["dataframe"] = pd.DataFrame(m["dataframe"])
+        msgs.append(nova_m)
+    return msgs
+
 def carregar_historico():
-    if not os.path.exists(ARQUIVO_HISTORICO):
-        return []
+    if not os.path.exists(ARQUIVO_HISTORICO): return []
     try:
         with open(ARQUIVO_HISTORICO, 'r', encoding='utf-8') as f:
             historico = json.load(f)
-            
-        # Filtrar apenas os últimos 30 dias
         limite_data = datetime.now() - timedelta(days=30)
-        historico_filtrado = []
-        for item in historico:
-            data_item = datetime.fromisoformat(item['data'])
-            if data_item >= limite_data:
-                historico_filtrado.append(item)
-                
-        return historico_filtrado
-    except Exception:
-        return []
+        return [sessao for sessao in historico if datetime.fromisoformat(sessao['data']) >= limite_data]
+    except: return []
 
-def salvar_historico(pergunta):
+def salvar_sessao(session_id, mensagens):
+    if len(mensagens) <= 1: return # Não salva se tiver apenas a saudação
+    
+    titulo = "Nova Conversa"
+    for m in mensagens:
+        if m["role"] == "user":
+            titulo = m["content"]
+            break
+
     historico = carregar_historico()
-    # Evitar duplicados seguidos
-    if not historico or historico[0]['pergunta'] != pergunta:
-        novo_item = {
-            "pergunta": pergunta,
-            "data": datetime.now().isoformat()
-        }
-        historico.insert(0, novo_item) # Adiciona no topo
-        
-        with open(ARQUIVO_HISTORICO, 'w', encoding='utf-8') as f:
-            json.dump(historico[:50], f, ensure_ascii=False, indent=4) # Guarda o top 50
-    return historico
+    # Remove a sessão antiga se já existir para atualizá-la no topo
+    historico = [h for h in historico if h.get("session_id") != session_id]
+    
+    nova_sessao = {
+        "session_id": session_id,
+        "titulo": titulo,
+        "data": datetime.now().isoformat(),
+        "messages": serializar_mensagens(mensagens)
+    }
+    historico.insert(0, nova_sessao)
+    
+    with open(ARQUIVO_HISTORICO, 'w', encoding='utf-8') as f:
+        json.dump(historico[:50], f, ensure_ascii=False, indent=4)
 
 # Inicializa variáveis de sessão
 if "session_id" not in st.session_state:
@@ -119,14 +179,8 @@ if "session_id" not in st.session_state:
 
 if "messages" not in st.session_state:
     st.session_state.messages = [
-        {
-            "role": "assistant",
-            "content": f"{saudacao}! Eu sou o **Vacinini**, o assistente virtual da **Farmazzini**. 💉\n\nEstou pronto para te ajudar a analisar os dados estratégicos de mercado. O que gostaria de consultar hoje?"
-        }
+        {"role": "assistant", "content": f"{saudacao}! Eu sou o **Vacinini**, o assistente virtual da **Farmazzini**. 💉\n\nEstou pronto para te ajudar a analisar os dados estratégicos de mercado. O que gostaria de consultar hoje?"}
     ]
-
-if "pesquisa_acionada" not in st.session_state:
-    st.session_state.pesquisa_acionada = None
 
 # --- CONEXÃO AWS BEDROCK ---
 try:
@@ -137,117 +191,83 @@ try:
         region_name=os.getenv("AWS_DEFAULT_REGION", "us-east-2")
     )
 except Exception as e:
-    st.error(f"⚠️ Erro de conexão com a nuvem. Verifique as configurações: {e}")
+    st.error(f"⚠️ Erro de conexão com a nuvem: {e}")
 
-
-# --- FUNÇÃO: converte tabela Markdown em DataFrame ---
+# --- FUNÇÕES DE DADOS E GRÁFICOS ---
 def markdown_para_dataframe(texto):
     linhas = texto.strip().split('\n')
     linhas_tabela = [l for l in linhas if '|' in l]
-    
-    if len(linhas_tabela) < 3:
-        return None
-    
+    if len(linhas_tabela) < 3: return None
     try:
         linhas_dados = [l for l in linhas_tabela if not re.match(r'^\s*\|[-|\s]+\|\s*$', l)]
         colunas = [c.strip() for c in linhas_dados[0].split('|') if c.strip()]
-        dados = []
-        for linha in linhas_dados[1:]:
-            valores = [v.strip() for v in linha.split('|') if v.strip()]
-            if len(valores) == len(colunas):
-                dados.append(valores)
-        
-        if not dados:
-            return None
-        
+        dados = [[v.strip() for v in l.split('|') if v.strip()] for l in linhas_dados[1:] if len([v.strip() for v in l.split('|') if v.strip()]) == len(colunas)]
+        if not dados: return None
         df = pd.DataFrame(dados, columns=colunas)
-        
         for col in df.columns:
             df[col] = df[col].str.replace('R\\$', '').str.replace(',', '.').str.strip()
-            try:
-                df[col] = pd.to_numeric(df[col])
-            except Exception:
-                pass
+            try: df[col] = pd.to_numeric(df[col])
+            except: pass
         return df
-    except Exception:
-        return None
+    except: return None
 
-# --- FUNÇÃO: detecta tipo de gráfico ideal e renderiza ---
 def renderizar_grafico(df, pergunta):
-    if df is None or df.empty or len(df.columns) < 2:
-        return
+    if df is None or df.empty or len(df.columns) < 2: return
+    colunas_num = df.select_dtypes(include='number').columns.tolist()
+    colunas_txt = df.select_dtypes(exclude='number').columns.tolist()
+    if not colunas_num or not colunas_txt: return
+    col_x, col_y = colunas_txt[0], colunas_num[0]
+    p_lower = pergunta.lower()
 
-    colunas_numericas = df.select_dtypes(include='number').columns.tolist()
-    colunas_texto = df.select_dtypes(exclude='number').columns.tolist()
-
-    if not colunas_numericas or not colunas_texto:
-        return
-
-    col_x = colunas_texto[0]
-    col_y = colunas_numericas[0]
-    pergunta_lower = pergunta.lower()
-
-    if any(p in pergunta_lower for p in ['participação', 'proporção', 'percentual', 'distribuição']):
+    if any(p in p_lower for p in ['participação', 'proporção']):
         fig = px.pie(df, names=col_x, values=col_y, title=f"Análise de {col_y}")
-    elif any(p in pergunta_lower for p in ['mês', 'mes', 'evolução', 'histórico', 'tempo', 'dia', 'semana']):
+    elif any(p in p_lower for p in ['mês', 'evolução', 'tempo']):
         fig = px.line(df, x=col_x, y=col_y, title=f"Evolução de {col_y}", markers=True)
     else:
-        df_sorted = df.sort_values(col_y, ascending=True)
-        fig = px.bar(df_sorted, x=col_y, y=col_x, orientation='h',
-                     title=f"Comparativo: {col_y} por {col_x}",
-                     color=col_y, color_continuous_scale='Greens') # Trocado para verde para combinar com farmácia
+        fig = px.bar(df.sort_values(col_y, ascending=True), x=col_y, y=col_x, orientation='h', title=f"Comparativo: {col_y} por {col_x}", color=col_y, color_continuous_scale='Reds')
 
-    fig.update_layout(
-        showlegend=False,
-        plot_bgcolor='rgba(0,0,0,0)',
-        margin=dict(l=20, r=20, t=40, b=20)
-    )
+    fig.update_layout(showlegend=False, plot_bgcolor='rgba(0,0,0,0)', margin=dict(l=20, r=20, t=40, b=20))
     st.plotly_chart(fig, use_container_width=True)
 
 # --- SIDEBAR (BARRA LATERAL) ---
 with st.sidebar:
-    if img_logo_completa:
-        st.image(img_logo_completa, use_container_width=True)
-    else:
-        st.title("💊 FARMAZZINI")
-
+    if img_logo_completa: st.image(img_logo_completa, use_container_width=True)
+    else: st.title("💊 FARMAZZINI")
     st.markdown("<br>", unsafe_allow_html=True)
     
     if st.button("➕ Nova Conversa", use_container_width=True, type="primary"):
-        st.session_state.messages = [
-            {
-                "role": "assistant",
-                "content": f"Histórico limpo! **Vacinini** pronto para uma nova consulta. O que vamos analisar agora?"
-            }
-        ]
         st.session_state.session_id = str(uuid.uuid4())
+        st.session_state.messages = [{"role": "assistant", "content": f"Histórico limpo! **Vacinini** pronto para uma nova consulta."}]
         st.rerun()
 
     st.markdown("---")
     st.markdown("### 🕒 Recentes (30 dias)")
     
-    # Carregar e exibir histórico
     historico_atual = carregar_historico()
     if not historico_atual:
         st.caption("Nenhuma pesquisa recente.")
     else:
-        for item in historico_atual:
-            # Encurtar texto muito longo para o botão
-            texto_botao = item['pergunta'] if len(item['pergunta']) < 28 else item['pergunta'][:25] + "..."
-            if st.button(f"💬 {texto_botao}", key=item['data']):
-                st.session_state.pesquisa_acionada = item['pergunta']
+        for sessao in historico_atual:
+            texto_botao = sessao['titulo'] if len(sessao['titulo']) < 28 else sessao['titulo'][:25] + "..."
+            # Quando clica no histórico, ele CARREGA a conversa inteira salva!
+            if st.button(f"💬 {texto_botao}", key=sessao['session_id']):
+                st.session_state.session_id = sessao['session_id']
+                st.session_state.messages = desserializar_mensagens(sessao['messages'])
+                st.rerun()
 
 # --- CORPO PRINCIPAL ---
-st.title("Sua Central de Inteligência")
-
-# Caixa de destaque profissional
-st.markdown("""
-<div class="highlight-box">
-    <strong>💡 Dicas de análise:</strong><br>
-    • <i>"Qual o preço médio do Omeprazol na Vera Cruz?"</i><br>
-    • <i>"Me mostre um comparativo de preços dos remédios mais vendidos."</i><br>
-</div>
-""", unsafe_allow_html=True)
+col1, col2 = st.columns([4, 1])
+with col1:
+    st.title("Sua Central de Inteligência")
+    st.markdown("""
+    <div class="highlight-box">
+        <strong>💡 Dicas de análise:</strong><br>
+        • <i>"Qual o preço médio do Omeprazol na Vera Cruz?"</i><br>
+        • <i>"Me mostre um comparativo de preços dos remédios mais vendidos."</i><br>
+    </div>
+    """, unsafe_allow_html=True)
+with col2:
+    if img_mascote: st.image(img_mascote, width=200)
 
 # Renderiza histórico de chat
 for msg in st.session_state.messages:
@@ -260,25 +280,13 @@ for msg in st.session_state.messages:
         with st.chat_message("user"):
             st.write(msg["content"])
 
-# Lógica de Input (aceita tanto o input manual quanto o clique no histórico)
-user_prompt = st.chat_input("Digite sua dúvida estratégica aqui...")
-
-# Se o utilizador clicou na sidebar, usa essa pesquisa
-if st.session_state.pesquisa_acionada:
-    user_prompt = st.session_state.pesquisa_acionada
-    st.session_state.pesquisa_acionada = None # Limpa o gatilho
-
-if user_prompt:
-    # Salva no histórico de 30 dias
-    salvar_historico(user_prompt)
-
-    with st.chat_message("user"):
-        st.write(user_prompt)
+# Lógica de Input 
+if user_prompt := st.chat_input("Digite sua dúvida estratégica aqui..."):
     st.session_state.messages.append({"role": "user", "content": user_prompt})
+    with st.chat_message("user"): st.write(user_prompt)
 
     with st.chat_message("assistant", avatar=caminho_mascote if img_mascote else "💊"):
         response_placeholder = st.empty()
-
         with st.spinner("Vacinini cruzando dados no Data Lake..."):
             try:
                 response = bedrock_runtime.invoke_agent(
@@ -289,28 +297,25 @@ if user_prompt:
                 )
 
                 full_response = ""
-                completion_stream = response.get('completion', [])
-
-                for event in completion_stream:
+                for event in response.get('completion', []):
                     if 'chunk' in event:
-                        chunk_bytes = event['chunk']['bytes']
-                        full_response += chunk_bytes.decode('utf-8')
-                        texto_seguro = full_response.replace("R$", "R\\$")
-                        response_placeholder.write(texto_seguro + "▌")
+                        full_response += event['chunk']['bytes'].decode('utf-8')
+                        response_placeholder.write(full_response.replace("R$", "R\\$") + "▌")
                         time.sleep(0.01)
 
-                texto_seguro_final = full_response.replace("R$", "R\\$")
-                response_placeholder.write(texto_seguro_final)
-
+                texto_final = full_response.replace("R$", "R\\$")
+                response_placeholder.write(texto_final)
+                
                 df = markdown_para_dataframe(full_response)
                 renderizar_grafico(df, user_prompt)
 
                 st.session_state.messages.append({
-                    "role": "assistant",
-                    "content": texto_seguro_final,
-                    "dataframe": df,
-                    "pergunta": user_prompt
+                    "role": "assistant", "content": texto_final, 
+                    "dataframe": df, "pergunta": user_prompt
                 })
+                
+                # Salva a sessão inteira APÓS gerar a resposta
+                salvar_sessao(st.session_state.session_id, st.session_state.messages)
 
             except Exception as e:
-                response_placeholder.error("⚠️ O sistema está temporariamente indisponível. Por favor, verifique sua conexão ou tente novamente em breve.")
+                response_placeholder.error("⚠️ O sistema está temporariamente indisponível.")
