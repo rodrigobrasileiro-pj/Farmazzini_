@@ -2,3 +2,5 @@ streamlit
 boto3
 python-dotenv
 pillow
+plotly
+pandas
