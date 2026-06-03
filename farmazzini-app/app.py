@@ -137,18 +137,11 @@ estilo_base = """
         box-shadow: 0 4px 8px rgba(217, 4, 41, 0.3) !important;
     }
     
-    /* Estilo da "Pasta" do Expander */
-    [data-testid="stExpander"] {
-        border: none !important;
-        background-color: transparent !important;
-    }
-    [data-testid="stExpander"] summary {
-        padding-left: 0 !important;
-    }
-    [data-testid="stExpander"] summary p {
-        font-weight: bold;
-        font-size: 16px;
-    }
+    /* Estilo da "Pasta" do Expander (Limpeza Base) */
+    [data-testid="stExpander"] { border: none !important; background-color: transparent !important; }
+    [data-testid="stExpander"] details { border: none !important; background-color: transparent !important; }
+    [data-testid="stExpander"] summary { background-color: transparent !important; padding-left: 0 !important; }
+    [data-testid="stExpander"] summary p { font-weight: bold; font-size: 16px; }
     
     .highlight-box {
         background-color: #f8f9fa; padding: 20px; border-radius: 12px;
@@ -184,11 +177,18 @@ estilo_escuro = """
     [data-testid="stChatInput"] button { background-color: transparent !important; }
     [data-testid="stChatInput"] svg { fill: white !important; }
     
-    /* Força o título da "Pasta" Abas Recentes e o ícone a ficarem brancos */
+    /* CORREÇÃO DA PASTA "ABAS RECENTES" (Apaga o fundo branco) */
+    [data-testid="stExpander"] { background-color: transparent !important; }
+    [data-testid="stExpander"] details { background-color: transparent !important; border: none !important; }
+    [data-testid="stExpander"] summary { background-color: transparent !important; color: #ffffff !important; }
+    [data-testid="stExpander"] summary:hover { background-color: #2b2b2b !important; }
+    
+    /* Força o título da "Pasta" e o ícone a ficarem brancos */
     [data-testid="stExpander"] summary p, 
     [data-testid="stExpander"] summary span, 
     [data-testid="stExpander"] svg {
         color: #ffffff !important;
+        fill: #ffffff !important;
     }
     
     /* Textos Gerais */
@@ -306,7 +306,6 @@ def renderizar_grafico(df, pergunta):
     else:
         fig = px.bar(df.sort_values(col_y, ascending=True), x=col_y, y=col_x, orientation='h', title=f"Comparativo: {col_y} por {col_x}", color=col_y, color_continuous_scale='Reds')
 
-    # Ajuste de cores dinâmico para os gráficos do Plotly
     cor_texto = "white" if st.session_state.dark_mode else "black"
     
     fig.update_layout(
@@ -334,15 +333,14 @@ with st.sidebar:
         st.rerun() 
     st.markdown("---")
     
-    # Botão com 'type="primary"' para aplicar o destaque no CSS
-    if st.button("➕ Nova Conversa", use_container_width=True, type="primary"):
+    # Botão corrigido usando símbolo de texto "+" em vez de emoji
+    if st.button("+ Nova Conversa", use_container_width=True, type="primary"):
         st.session_state.session_id = str(uuid.uuid4())
         st.session_state.messages = [{"role": "assistant", "content": f"Histórico limpo! **Vacinini** pronto para uma nova consulta."}]
         st.rerun()
 
     st.markdown("<br>", unsafe_allow_html=True)
     
-    # Criando a "Pasta" de Abas Recentes usando Expander
     with st.expander("📂 Abas Recentes", expanded=True):
         historico_atual = carregar_historico()
         if not historico_atual:
@@ -353,7 +351,6 @@ with st.sidebar:
                 texto_botao = titulo_sessao if len(titulo_sessao) < 28 else titulo_sessao[:25] + "..."
                 chave_botao = sessao.get('data', str(uuid.uuid4()))
                 
-                # 'kind="secondary"' é o padrão, que pega o estilo hover vermelho que definimos
                 if st.button(f"💬 {texto_botao}", key=chave_botao):
                     st.session_state.session_id = sessao.get('session_id', str(uuid.uuid4()))
                     
