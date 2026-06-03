@@ -112,13 +112,42 @@ estilo_base = """
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     
-    [data-testid="stSidebar"] .stButton>button {
+    /* Botões Padrão da Sidebar (Histórico) */
+    [data-testid="stSidebar"] .stButton>button[kind="secondary"] {
         width: 100%; border-radius: 8px; text-align: left; border: 1px solid transparent;
         background-color: transparent; color: inherit; padding: 10px 15px;
         justify-content: flex-start; transition: all 0.2s ease-in-out;
     }
-    [data-testid="stSidebar"] .stButton>button:hover {
+    [data-testid="stSidebar"] .stButton>button[kind="secondary"]:hover {
         border: 1px solid #d90429; color: #d90429;
+    }
+    
+    /* Botão Destaque: NOVA CONVERSA */
+    [data-testid="stSidebar"] button[kind="primary"] {
+        background-color: #d90429 !important;
+        color: white !important;
+        border-radius: 8px !important;
+        border: none !important;
+        font-weight: bold !important;
+        padding: 12px 20px !important;
+        transition: all 0.3s ease !important;
+    }
+    [data-testid="stSidebar"] button[kind="primary"]:hover {
+        background-color: #b00322 !important;
+        box-shadow: 0 4px 8px rgba(217, 4, 41, 0.3) !important;
+    }
+    
+    /* Estilo da "Pasta" do Expander */
+    [data-testid="stExpander"] {
+        border: none !important;
+        background-color: transparent !important;
+    }
+    [data-testid="stExpander"] summary {
+        padding-left: 0 !important;
+    }
+    [data-testid="stExpander"] summary p {
+        font-weight: bold;
+        font-size: 16px;
     }
     
     .highlight-box {
@@ -142,21 +171,25 @@ estilo_escuro = """
         border-left: 5px solid #d90429 !important;
     }
     
-    /* CORREÇÃO DA BARRA DE DIGITAÇÃO: Força TODAS as camadas internas a ficarem escuras */
+    /* CORREÇÃO DA BARRA DE DIGITAÇÃO */
     [data-testid="stBottomBlockContainer"] { background-color: #121212 !important; }
     [data-testid="stChatInput"] { background-color: #121212 !important; }
     
-    /* Caixa principal da barra e todos os divs dentro dela */
     [data-testid="stChatInput"] > div { background-color: #2b2b2b !important; border: 1px solid #555 !important; }
     [data-testid="stChatInput"] div { background-color: transparent !important; color: white !important; }
     
-    /* A área de texto onde escrevemos */
     [data-testid="stChatInput"] textarea { background-color: transparent !important; color: white !important; }
     [data-testid="stChatInput"] textarea::placeholder { color: #aaaaaa !important; }
     
-    /* O botão de enviar e o ícone */
     [data-testid="stChatInput"] button { background-color: transparent !important; }
     [data-testid="stChatInput"] svg { fill: white !important; }
+    
+    /* Força o título da "Pasta" Abas Recentes e o ícone a ficarem brancos */
+    [data-testid="stExpander"] summary p, 
+    [data-testid="stExpander"] summary span, 
+    [data-testid="stExpander"] svg {
+        color: #ffffff !important;
+    }
     
     /* Textos Gerais */
     h1, h2, h3, h4, h5, h6, p, span { color: #ffffff; }
@@ -287,7 +320,6 @@ def renderizar_grafico(df, pergunta):
 
 # --- SIDEBAR (BARRA LATERAL) ---
 with st.sidebar:
-    # Troca dinâmica da logo baseada no modo escuro
     if st.session_state.dark_mode and img_logo_escuro:
         st.image(img_logo_escuro, use_container_width=True)
     elif img_logo_completa:
@@ -295,7 +327,6 @@ with st.sidebar:
     else:
         st.title("💊 FARMAZZINI")
     
-    # --- BOTÃO DE MODO ESCURO ---
     st.markdown("<br>", unsafe_allow_html=True)
     novo_modo = st.toggle("🌙 Modo Escuro", value=st.session_state.dark_mode)
     if novo_modo != st.session_state.dark_mode:
@@ -303,34 +334,37 @@ with st.sidebar:
         st.rerun() 
     st.markdown("---")
     
+    # Botão com 'type="primary"' para aplicar o destaque no CSS
     if st.button("➕ Nova Conversa", use_container_width=True, type="primary"):
         st.session_state.session_id = str(uuid.uuid4())
         st.session_state.messages = [{"role": "assistant", "content": f"Histórico limpo! **Vacinini** pronto para uma nova consulta."}]
         st.rerun()
 
-    st.markdown("---")
-    st.markdown("### 🕒 Recentes (30 dias)")
+    st.markdown("<br>", unsafe_allow_html=True)
     
-    historico_atual = carregar_historico()
-    if not historico_atual:
-        st.caption("Nenhuma pesquisa recente.")
-    else:
-        for sessao in historico_atual:
-            titulo_sessao = sessao.get('titulo', sessao.get('pergunta', 'Sessão Antiga'))
-            texto_botao = titulo_sessao if len(titulo_sessao) < 28 else titulo_sessao[:25] + "..."
-            chave_botao = sessao.get('data', str(uuid.uuid4()))
-            
-            if st.button(f"💬 {texto_botao}", key=chave_botao):
-                st.session_state.session_id = sessao.get('session_id', str(uuid.uuid4()))
+    # Criando a "Pasta" de Abas Recentes usando Expander
+    with st.expander("📂 Abas Recentes", expanded=True):
+        historico_atual = carregar_historico()
+        if not historico_atual:
+            st.caption("Nenhuma pesquisa recente.")
+        else:
+            for sessao in historico_atual:
+                titulo_sessao = sessao.get('titulo', sessao.get('pergunta', 'Sessão Antiga'))
+                texto_botao = titulo_sessao if len(titulo_sessao) < 28 else titulo_sessao[:25] + "..."
+                chave_botao = sessao.get('data', str(uuid.uuid4()))
                 
-                if 'messages' in sessao:
-                    st.session_state.messages = desserializar_mensagens(sessao['messages'])
-                else:
-                    st.session_state.messages = [
-                        {"role": "assistant", "content": "A recuperar formato de pesquisa antiga..."},
-                        {"role": "user", "content": titulo_sessao}
-                    ]
-                st.rerun()
+                # 'kind="secondary"' é o padrão, que pega o estilo hover vermelho que definimos
+                if st.button(f"💬 {texto_botao}", key=chave_botao):
+                    st.session_state.session_id = sessao.get('session_id', str(uuid.uuid4()))
+                    
+                    if 'messages' in sessao:
+                        st.session_state.messages = desserializar_mensagens(sessao['messages'])
+                    else:
+                        st.session_state.messages = [
+                            {"role": "assistant", "content": "A recuperar formato de pesquisa antiga..."},
+                            {"role": "user", "content": titulo_sessao}
+                        ]
+                    st.rerun()
 
 # --- CORPO PRINCIPAL ---
 col1, col2 = st.columns([4, 1])
