@@ -17,7 +17,7 @@ load_dotenv()
 # --- CONFIGURAÇÕES E ASSETS ---
 BASE_DIR = os.path.dirname(__file__)
 caminho_logo = os.path.join(BASE_DIR, 'logo_farmazzini.png')
-caminho_logo_escuro = os.path.join(BASE_DIR, 'logo_farmazzini_dark.png') # Novo caminho para a logo escura
+caminho_logo_escuro = os.path.join(BASE_DIR, 'logo_farmazzini_dark.png') 
 caminho_mascote = os.path.join(BASE_DIR, 'mascote_farmazzini.png')
 ARQUIVO_HISTORICO = os.path.join(BASE_DIR, 'historico_pesquisas.json')
 
@@ -142,16 +142,24 @@ estilo_escuro = """
         border-left: 5px solid #d90429 !important;
     }
     
-    /* Input do Chat e o container de fundo branco que fica por trás dele */
+    /* CORREÇÃO DA BARRA DE DIGITAÇÃO: Força TODAS as camadas internas a ficarem escuras */
     [data-testid="stBottomBlockContainer"] { background-color: #121212 !important; }
-    [data-testid="stChatInput"] { background-color: #2b2b2b !important; border-color: #444 !important; }
-    [data-testid="stChatInput"] > div { background-color: transparent !important; color: white !important; }
-    [data-testid="stChatInput"] textarea { color: white !important; background-color: transparent !important; }
-    [data-testid="stChatInput"] button { color: white !important; background-color: transparent !important; }
+    [data-testid="stChatInput"] { background-color: #121212 !important; }
+    
+    /* Caixa principal da barra e todos os divs dentro dela */
+    [data-testid="stChatInput"] > div { background-color: #2b2b2b !important; border: 1px solid #555 !important; }
+    [data-testid="stChatInput"] div { background-color: transparent !important; color: white !important; }
+    
+    /* A área de texto onde escrevemos */
+    [data-testid="stChatInput"] textarea { background-color: transparent !important; color: white !important; }
+    [data-testid="stChatInput"] textarea::placeholder { color: #aaaaaa !important; }
+    
+    /* O botão de enviar e o ícone */
+    [data-testid="stChatInput"] button { background-color: transparent !important; }
     [data-testid="stChatInput"] svg { fill: white !important; }
     
     /* Textos Gerais */
-    h1, h2, h3, h4, h5, h6, p, div, span { color: #ffffff; }
+    h1, h2, h3, h4, h5, h6, p, span { color: #ffffff; }
     </style>
 """
 
