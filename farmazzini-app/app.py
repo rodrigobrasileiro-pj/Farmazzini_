@@ -17,14 +17,23 @@ load_dotenv()
 # --- CONFIGURAÇÕES E ASSETS ---
 BASE_DIR = os.path.dirname(__file__)
 caminho_logo = os.path.join(BASE_DIR, 'logo_farmazzini.png')
+caminho_logo_escuro = os.path.join(BASE_DIR, 'logo_farmazzini_dark.png') # Novo caminho para a logo escura
 caminho_mascote = os.path.join(BASE_DIR, 'mascote_farmazzini.png')
 ARQUIVO_HISTORICO = os.path.join(BASE_DIR, 'historico_pesquisas.json')
 
 try:
     img_logo_completa = Image.open(caminho_logo)
-    img_mascote = Image.open(caminho_mascote)
 except Exception:
     img_logo_completa = None
+
+try:
+    img_logo_escuro = Image.open(caminho_logo_escuro)
+except Exception:
+    img_logo_escuro = None
+
+try:
+    img_mascote = Image.open(caminho_mascote)
+except Exception:
     img_mascote = None
 
 hora_atual = datetime.now().hour
@@ -133,9 +142,13 @@ estilo_escuro = """
         border-left: 5px solid #d90429 !important;
     }
     
-    /* Input do Chat */
-    [data-testid="stChatInput"] { background-color: #2b2b2b !important; color: white !important; }
-    [data-testid="stChatInput"] textarea { color: white !important; }
+    /* Input do Chat e o container de fundo branco que fica por trás dele */
+    [data-testid="stBottomBlockContainer"] { background-color: #121212 !important; }
+    [data-testid="stChatInput"] { background-color: #2b2b2b !important; border-color: #444 !important; }
+    [data-testid="stChatInput"] > div { background-color: transparent !important; color: white !important; }
+    [data-testid="stChatInput"] textarea { color: white !important; background-color: transparent !important; }
+    [data-testid="stChatInput"] button { color: white !important; background-color: transparent !important; }
+    [data-testid="stChatInput"] svg { fill: white !important; }
     
     /* Textos Gerais */
     h1, h2, h3, h4, h5, h6, p, div, span { color: #ffffff; }
@@ -258,7 +271,7 @@ def renderizar_grafico(df, pergunta):
     fig.update_layout(
         showlegend=False, 
         plot_bgcolor='rgba(0,0,0,0)', 
-        paper_bgcolor='rgba(0,0,0,0)', # Fundo transparente para casar com o modo escuro
+        paper_bgcolor='rgba(0,0,0,0)', 
         font_color=cor_texto,
         margin=dict(l=20, r=20, t=40, b=20)
     )
@@ -266,15 +279,20 @@ def renderizar_grafico(df, pergunta):
 
 # --- SIDEBAR (BARRA LATERAL) ---
 with st.sidebar:
-    if img_logo_completa: st.image(img_logo_completa, use_container_width=True)
-    else: st.title("💊 FARMAZZINI")
+    # Troca dinâmica da logo baseada no modo escuro
+    if st.session_state.dark_mode and img_logo_escuro:
+        st.image(img_logo_escuro, use_container_width=True)
+    elif img_logo_completa:
+        st.image(img_logo_completa, use_container_width=True)
+    else:
+        st.title("💊 FARMAZZINI")
     
-    # --- NOVO BOTÃO DE MODO ESCURO ---
+    # --- BOTÃO DE MODO ESCURO ---
     st.markdown("<br>", unsafe_allow_html=True)
     novo_modo = st.toggle("🌙 Modo Escuro", value=st.session_state.dark_mode)
     if novo_modo != st.session_state.dark_mode:
         st.session_state.dark_mode = novo_modo
-        st.rerun() # Atualiza a página instantaneamente para aplicar o CSS
+        st.rerun() 
     st.markdown("---")
     
     if st.button("➕ Nova Conversa", use_container_width=True, type="primary"):
