@@ -1,5 +1,52 @@
 [
     {
+        "session_id": "aed38705-cfda-4f38-a6a5-73f02f91090f",
+        "titulo": "em qual das farmácias a dipirona está mais barata?",
+        "data": "2026-06-02T00:59:56.948097",
+        "messages": [
+            {
+                "role": "assistant",
+                "content": "Bom dia! Eu sou o **Vacinini**, o assistente virtual da **Farmazzini**. 💉\n\nEstou pronto para te ajudar a analisar os dados estratégicos de mercado. O que gostaria de consultar hoje?"
+            },
+            {
+                "role": "user",
+                "content": "em qual das farmácias a dipirona está mais barata?"
+            },
+            {
+                "role": "assistant",
+                "content": "A dipirona está mais barata na FARMA PONTE por R\\$ 2,66.",
+                "pergunta": "em qual das farmácias a dipirona está mais barata?"
+            },
+            {
+                "role": "user",
+                "content": "Me mostre um comparativo de preços dos remédios mais vendidos."
+            },
+            {
+                "role": "assistant",
+                "content": "Infelizmente, os remédios mais vendidos não estão disponíveis no mercado no momento.",
+                "pergunta": "Me mostre um comparativo de preços dos remédios mais vendidos."
+            },
+            {
+                "role": "user",
+                "content": "qual o preço da dipirona em cada farmácia?"
+            },
+            {
+                "role": "assistant",
+                "content": "O preço da dipirona em cada farmácia é o seguinte:\n- FARMA PONTE: R\\$ 2,66\n- SAO JOAO: R\\$ 4,99\n- VERA CRUZ: R\\$ 7,43\n- DROGARIA SAO PAULO: R\\$ 10,39",
+                "pergunta": "qual o preço da dipirona em cada farmácia?"
+            },
+            {
+                "role": "user",
+                "content": "Me mostre um comparativo de preços dos remédios mais vendidos."
+            },
+            {
+                "role": "assistant",
+                "content": "Infelizmente, os remédios mais vendidos não estão disponíveis no mercado no momento.",
+                "pergunta": "Me mostre um comparativo de preços dos remédios mais vendidos."
+            }
+        ]
+    },
+    {
         "session_id": "d067b5d7-a67e-4afe-844b-afdba34efdaf",
         "titulo": "Qual o preço médio do Omeprazol na Vera Cruz?",
         "data": "2026-06-01T14:10:33.469058",

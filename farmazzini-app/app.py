@@ -42,10 +42,13 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# Inicializa variável de Modo Escuro na Sessão
+if "dark_mode" not in st.session_state:
+    st.session_state.dark_mode = False
+
 # --- TELA DE CARREGAMENTO (SPLASH SCREEN) ---
 def renderizar_splash_screen():
     if "splash_mostrada" not in st.session_state:
-        # Converter imagem para Base64 para exibir no HTML
         img_b64 = ""
         try:
             with open(caminho_mascote, "rb") as f:
@@ -78,7 +81,6 @@ def renderizar_splash_screen():
             50% {{ width: 70%; }}
             100% {{ width: 100%; }}
         }}
-        /* Oculta a barra nativa do Streamlit enquanto carrega */
         [data-testid="stAppViewBlockContainer"] {{ animation: delayShow 2.5s; }}
         @keyframes delayShow {{ from {{ opacity: 0; }} to {{ opacity: 1; }} }}
         </style>
@@ -93,31 +95,57 @@ def renderizar_splash_screen():
         st.markdown(splash_html, unsafe_allow_html=True)
         st.session_state.splash_mostrada = True
 
-# Chama a tela de carregamento logo no início
 renderizar_splash_screen()
 
-# --- CSS CUSTOMIZADO (DESIGN PROFISSIONAL) ---
-st.markdown("""
+# --- CSS CUSTOMIZADO (BASE + MODO ESCURO DINÂMICO) ---
+estilo_base = """
     <style>
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     
     [data-testid="stSidebar"] .stButton>button {
         width: 100%; border-radius: 8px; text-align: left; border: 1px solid transparent;
-        background-color: transparent; color: #333; padding: 10px 15px;
+        background-color: transparent; color: inherit; padding: 10px 15px;
         justify-content: flex-start; transition: all 0.2s ease-in-out;
     }
     [data-testid="stSidebar"] .stButton>button:hover {
-        background-color: #f0f2f6; border: 1px solid #d90429; color: #d90429;
+        border: 1px solid #d90429; color: #d90429;
     }
     
     .highlight-box {
         background-color: #f8f9fa; padding: 20px; border-radius: 12px;
         border-left: 5px solid #d90429; margin-bottom: 25px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05); color: black;
     }
     </style>
-    """, unsafe_allow_html=True)
+"""
+
+estilo_escuro = """
+    <style>
+    /* Sobrescrita para Modo Escuro */
+    .stApp { background-color: #121212; color: #ffffff; }
+    [data-testid="stHeader"] { background-color: transparent; }
+    [data-testid="stSidebar"] { background-color: #1e1e1e; }
+    
+    .highlight-box {
+        background-color: #2b2b2b !important; 
+        color: #ffffff !important; 
+        border-left: 5px solid #d90429 !important;
+    }
+    
+    /* Input do Chat */
+    [data-testid="stChatInput"] { background-color: #2b2b2b !important; color: white !important; }
+    [data-testid="stChatInput"] textarea { color: white !important; }
+    
+    /* Textos Gerais */
+    h1, h2, h3, h4, h5, h6, p, div, span { color: #ffffff; }
+    </style>
+"""
+
+# Aplica o CSS Base e, se o toggle estiver ativo, aplica o CSS Escuro por cima
+st.markdown(estilo_base, unsafe_allow_html=True)
+if st.session_state.dark_mode:
+    st.markdown(estilo_escuro, unsafe_allow_html=True)
 
 # --- FUNÇÕES DE HISTÓRICO COM MEMÓRIA COMPLETA (SESSÕES) ---
 def serializar_mensagens(mensagens):
@@ -150,7 +178,7 @@ def carregar_historico():
     except: return []
 
 def salvar_sessao(session_id, mensagens):
-    if len(mensagens) <= 1: return # Não salva se tiver apenas a saudação
+    if len(mensagens) <= 1: return 
     
     titulo = "Nova Conversa"
     for m in mensagens:
@@ -159,7 +187,6 @@ def salvar_sessao(session_id, mensagens):
             break
 
     historico = carregar_historico()
-    # Remove a sessão antiga se já existir para atualizá-la no topo
     historico = [h for h in historico if h.get("session_id") != session_id]
     
     nova_sessao = {
@@ -173,7 +200,6 @@ def salvar_sessao(session_id, mensagens):
     with open(ARQUIVO_HISTORICO, 'w', encoding='utf-8') as f:
         json.dump(historico[:50], f, ensure_ascii=False, indent=4)
 
-# Inicializa variáveis de sessão
 if "session_id" not in st.session_state:
     st.session_state.session_id = str(uuid.uuid4())
 
@@ -226,14 +252,30 @@ def renderizar_grafico(df, pergunta):
     else:
         fig = px.bar(df.sort_values(col_y, ascending=True), x=col_y, y=col_x, orientation='h', title=f"Comparativo: {col_y} por {col_x}", color=col_y, color_continuous_scale='Reds')
 
-    fig.update_layout(showlegend=False, plot_bgcolor='rgba(0,0,0,0)', margin=dict(l=20, r=20, t=40, b=20))
+    # Ajuste de cores dinâmico para os gráficos do Plotly
+    cor_texto = "white" if st.session_state.dark_mode else "black"
+    
+    fig.update_layout(
+        showlegend=False, 
+        plot_bgcolor='rgba(0,0,0,0)', 
+        paper_bgcolor='rgba(0,0,0,0)', # Fundo transparente para casar com o modo escuro
+        font_color=cor_texto,
+        margin=dict(l=20, r=20, t=40, b=20)
+    )
     st.plotly_chart(fig, use_container_width=True)
 
 # --- SIDEBAR (BARRA LATERAL) ---
 with st.sidebar:
     if img_logo_completa: st.image(img_logo_completa, use_container_width=True)
     else: st.title("💊 FARMAZZINI")
+    
+    # --- NOVO BOTÃO DE MODO ESCURO ---
     st.markdown("<br>", unsafe_allow_html=True)
+    novo_modo = st.toggle("🌙 Modo Escuro", value=st.session_state.dark_mode)
+    if novo_modo != st.session_state.dark_mode:
+        st.session_state.dark_mode = novo_modo
+        st.rerun() # Atualiza a página instantaneamente para aplicar o CSS
+    st.markdown("---")
     
     if st.button("➕ Nova Conversa", use_container_width=True, type="primary"):
         st.session_state.session_id = str(uuid.uuid4())
@@ -248,7 +290,6 @@ with st.sidebar:
         st.caption("Nenhuma pesquisa recente.")
     else:
         for sessao in historico_atual:
-            # BLOCO CORRIGIDO: Tratamento de compatibilidade com histórico antigo
             titulo_sessao = sessao.get('titulo', sessao.get('pergunta', 'Sessão Antiga'))
             texto_botao = titulo_sessao if len(titulo_sessao) < 28 else titulo_sessao[:25] + "..."
             chave_botao = sessao.get('data', str(uuid.uuid4()))
@@ -259,7 +300,6 @@ with st.sidebar:
                 if 'messages' in sessao:
                     st.session_state.messages = desserializar_mensagens(sessao['messages'])
                 else:
-                    # Fallback caso clique num item guardado com a versão antiga do código
                     st.session_state.messages = [
                         {"role": "assistant", "content": "A recuperar formato de pesquisa antiga..."},
                         {"role": "user", "content": titulo_sessao}
@@ -325,7 +365,6 @@ if user_prompt := st.chat_input("Digite sua dúvida estratégica aqui..."):
                     "dataframe": df, "pergunta": user_prompt
                 })
                 
-                # Salva a sessão inteira APÓS gerar a resposta
                 salvar_sessao(st.session_state.session_id, st.session_state.messages)
 
             except Exception as e:
