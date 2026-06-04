@@ -62,7 +62,7 @@ def renderizar_splash_screen():
     if "splash_mostrada" not in st.session_state:
         img_html = f'<img src="data:image/png;base64,{mascote_b64}" width="250" style="margin-bottom: 20px;">' if mascote_b64 else '<h1>💊 Farmazzini</h1>'
 
-        # Separando CSS em string normal para evitar SyntaxError com chaves
+        # Separando CSS em string normal para evitar erros de formatação
         css_splash = """
         <style>
         #splash-screen {
@@ -92,7 +92,6 @@ def renderizar_splash_screen():
         </style>
         """
         
-        # HTML usando f-string de forma segura
         html_splash = f"""
         <div id="splash-screen">
             {img_html}
@@ -114,7 +113,6 @@ estilo_base = """
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     
-    /* Botões Padrão da Sidebar (Histórico) */
     [data-testid="stSidebar"] .stButton>button[kind="secondary"] {
         width: 100%; border-radius: 8px; text-align: left; border: 1px solid transparent;
         background-color: transparent; color: inherit; padding: 10px 15px;
@@ -124,7 +122,6 @@ estilo_base = """
         border: 1px solid #d90429; color: #d90429;
     }
     
-    /* Botão Destaque: NOVA CONVERSA */
     [data-testid="stSidebar"] button[kind="primary"] {
         background-color: #d90429 !important;
         color: white !important;
@@ -139,7 +136,6 @@ estilo_base = """
         box-shadow: 0 4px 8px rgba(217, 4, 41, 0.3) !important;
     }
     
-    /* Estilo da "Pasta" do Expander */
     [data-testid="stExpander"] { border: none !important; background-color: transparent !important; }
     [data-testid="stExpander"] details { border: none !important; background-color: transparent !important; }
     [data-testid="stExpander"] summary { background-color: transparent !important; padding-left: 0 !important; }
@@ -165,7 +161,6 @@ estilo_escuro = """
         border-left: 5px solid #d90429 !important;
     }
     
-    /* CORREÇÃO DA BARRA DE DIGITAÇÃO */
     [data-testid="stBottomBlockContainer"] { background-color: #121212 !important; }
     [data-testid="stChatInput"] { background-color: #121212 !important; }
     [data-testid="stChatInput"] > div { background-color: #2b2b2b !important; border: 1px solid #555 !important; }
@@ -175,14 +170,12 @@ estilo_escuro = """
     [data-testid="stChatInput"] button { background-color: transparent !important; }
     [data-testid="stChatInput"] svg { fill: white !important; }
     
-    /* CORREÇÃO DAS RESPOSTAS DO CHAT (Assistente - Letras Brancas) */
     [data-testid="stChatMessageContent"] { color: #ffffff !important; }
     [data-testid="stChatMessageContent"] p, 
     [data-testid="stChatMessageContent"] div, 
     [data-testid="stChatMessageContent"] span,
     .stMarkdown, .stMarkdown p { color: #ffffff !important; }
     
-    /* BUBBLE DO USUÁRIO NO MODO ESCURO (Fundo Branco, Letras Pretas) */
     [data-testid="stChatMessage"]:has(.user-msg-marker) {
         background-color: #ffffff !important;
         border: 1px solid #e0e0e0 !important;
@@ -194,7 +187,6 @@ estilo_escuro = """
         color: #000000 !important; 
     }
     
-    /* CORREÇÃO DA PASTA "ABAS RECENTES" */
     [data-testid="stExpander"] { background-color: transparent !important; }
     [data-testid="stExpander"] details { background-color: transparent !important; border: none !important; }
     [data-testid="stExpander"] summary { background-color: transparent !important; color: #ffffff !important; }
@@ -293,6 +285,202 @@ except Exception as e:
 def markdown_para_dataframe(texto):
     linhas = texto.strip().split('\n')
     linhas_tabela = [l for l in linhas if '|' in l]
-    if len(linhas_tabela) < 3: return None
+    
+    if len(linhas_tabela) < 3: 
+        return None
+        
     try:
-        linhas_dados = [l for l in linhas_tabela if not re.match
+        # Refatorado: Substituição de linhas longas por loops simples e seguros
+        linhas_dados = []
+        for l in linhas_tabela:
+            # Ignora a linha de separadores (ex: |---|---|)
+            if not re.match(r'^\s*\|[-|\s]+\|\s*$', l):
+                linhas_dados.append(l)
+                
+        if not linhas_dados:
+            return None
+            
+        colunas = [c.strip() for c in linhas_dados[0].split('|') if c.strip()]
+        
+        dados = []
+        for l in linhas_dados[1:]:
+            valores = [v.strip() for v in l.split('|') if v.strip()]
+            # Só adiciona a linha se tiver a mesma quantidade de colunas do cabeçalho
+            if len(valores) == len(colunas):
+                dados.append(valores)
+                
+        if not dados: 
+            return None
+            
+        df = pd.DataFrame(dados, columns=colunas)
+        
+        for col in df.columns:
+            df[col] = df[col].str.replace('R\\$', '').str.replace(',', '.').str.strip()
+            try: 
+                df[col] = pd.to_numeric(df[col])
+            except: 
+                pass
+                
+        return df
+    except: 
+        return None
+
+def renderizar_grafico(df, pergunta):
+    if df is None or df.empty or len(df.columns) < 2: return
+    colunas_num = df.select_dtypes(include='number').columns.tolist()
+    colunas_txt = df.select_dtypes(exclude='number').columns.tolist()
+    if not colunas_num or not colunas_txt: return
+    col_x, col_y = colunas_txt[0], colunas_num[0]
+    p_lower = pergunta.lower()
+
+    if any(p in p_lower for p in ['participação', 'proporção']):
+        fig = px.pie(df, names=col_x, values=col_y, title=f"Análise de {col_y}")
+    elif any(p in p_lower for p in ['mês', 'evolução', 'tempo']):
+        fig = px.line(df, x=col_x, y=col_y, title=f"Evolução de {col_y}", markers=True)
+    else:
+        fig = px.bar(df.sort_values(col_y, ascending=True), x=col_y, y=col_x, orientation='h', title=f"Comparativo: {col_y} por {col_x}", color=col_y, color_continuous_scale='Reds')
+
+    cor_texto = "white" if st.session_state.dark_mode else "black"
+    
+    fig.update_layout(
+        showlegend=False, 
+        plot_bgcolor='rgba(0,0,0,0)', 
+        paper_bgcolor='rgba(0,0,0,0)', 
+        font_color=cor_texto,
+        margin=dict(l=20, r=20, t=40, b=20)
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+# --- SIDEBAR (BARRA LATERAL) ---
+with st.sidebar:
+    current_logo = logo_escuro_b64 if st.session_state.dark_mode and logo_escuro_b64 else logo_b64
+    if current_logo:
+        st.markdown(f'<img src="data:image/png;base64,{current_logo}" style="width:100%; pointer-events:none; margin-bottom: 15px;">', unsafe_allow_html=True)
+    else:
+        st.title("💊 FARMAZZINI")
+    
+    st.markdown("<br>", unsafe_allow_html=True)
+    novo_modo = st.toggle("🌙 Modo Escuro", value=st.session_state.dark_mode)
+    if novo_modo != st.session_state.dark_mode:
+        st.session_state.dark_mode = novo_modo
+        st.rerun() 
+    st.markdown("---")
+    
+    if st.button("+ Nova Conversa", use_container_width=True, type="primary"):
+        st.session_state.session_id = str(uuid.uuid4())
+        st.session_state.messages = [{"role": "assistant", "content": f"Histórico limpo! **Vacinini** pronto para uma nova consulta."}]
+        st.rerun()
+
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    with st.expander("📂 Abas Recentes", expanded=True):
+        historico_atual = carregar_historico()
+        if not historico_atual:
+            st.caption("Nenhuma pesquisa recente.")
+        else:
+            for sessao in historico_atual:
+                sessao_id = sessao.get('session_id', str(uuid.uuid4()))
+                titulo_sessao = sessao.get('titulo', sessao.get('pergunta', 'Sessão Antiga'))
+                texto_botao = titulo_sessao if len(titulo_sessao) < 22 else titulo_sessao[:19] + "..."
+                chave_botao = sessao.get('data', str(uuid.uuid4()))
+                
+                col_chat, col_del = st.columns([8, 2])
+                with col_chat:
+                    if st.button(f"💬 {texto_botao}", key=f"chat_{chave_botao}"):
+                        st.session_state.session_id = sessao_id
+                        if 'messages' in sessao:
+                            st.session_state.messages = desserializar_mensagens(sessao['messages'])
+                        else:
+                            st.session_state.messages = [
+                                {"role": "assistant", "content": "A recuperar formato de pesquisa antiga..."},
+                                {"role": "user", "content": titulo_sessao}
+                            ]
+                        st.rerun()
+                with col_del:
+                    if st.button("❌", key=f"del_{chave_botao}"):
+                        st.session_state.confirmar_delete = sessao_id
+                
+                if st.session_state.confirmar_delete == sessao_id:
+                    st.markdown("<div style='text-align:center; color:#d90429; font-weight:bold;'>Apagar conversa?</div>", unsafe_allow_html=True)
+                    c1, c2 = st.columns(2)
+                    if c1.button("Sim", key=f"yes_{chave_botao}", use_container_width=True):
+                        deletar_sessao(sessao_id)
+                        st.session_state.confirmar_delete = None
+                        if st.session_state.session_id == sessao_id:
+                            st.session_state.session_id = str(uuid.uuid4())
+                            st.session_state.messages = [{"role": "assistant", "content": f"{saudacao}! Eu sou o **Vacinini**..."}]
+                        st.rerun()
+                    if c2.button("Não", key=f"no_{chave_botao}", use_container_width=True):
+                        st.session_state.confirmar_delete = None
+                        st.rerun()
+
+# --- CORPO PRINCIPAL ---
+col1, col2 = st.columns([4, 1])
+with col1:
+    st.title("Sua Central de Inteligência")
+    st.markdown("""
+    <div class="highlight-box">
+        <strong>💡 Dicas de análise:</strong><br>
+        • <i>"Qual o preço médio do Omeprazol na Vera Cruz?"</i><br>
+        • <i>"Gere um gráfico comparativo de preços da Dipirona por farmácia."</i><br>
+    </div>
+    """, unsafe_allow_html=True)
+with col2:
+    if mascote_b64:
+        st.markdown(f'<img src="data:image/png;base64,{mascote_b64}" style="width:200px; pointer-events:none;">', unsafe_allow_html=True)
+
+# Define as variáveis de avatar para facilitar a renderização
+path_mascote = caminho_mascote if mascote_b64 else "💊"
+path_user = caminho_avatar_usuario if avatar_usuario_b64 else "👤"
+
+# Renderiza histórico de chat
+for msg in st.session_state.messages:
+    if msg["role"] == "assistant":
+        with st.chat_message("assistant", avatar=path_mascote):
+            st.write(msg["content"])
+            if "dataframe" in msg and msg["dataframe"] is not None:
+                renderizar_grafico(msg["dataframe"], msg.get("pergunta", ""))
+    else:
+        with st.chat_message("user", avatar=path_user):
+            st.markdown(f"<div class='user-msg-marker'>{msg['content']}</div>", unsafe_allow_html=True)
+
+# Lógica de Input 
+if user_prompt := st.chat_input("Digite sua dúvida estratégica aqui..."):
+    st.session_state.messages.append({"role": "user", "content": user_prompt})
+    
+    with st.chat_message("user", avatar=path_user):
+        st.markdown(f"<div class='user-msg-marker'>{user_prompt}</div>", unsafe_allow_html=True)
+
+    with st.chat_message("assistant", avatar=path_mascote):
+        response_placeholder = st.empty()
+        with st.spinner("Vacinini cruzando dados no Data Lake..."):
+            try:
+                response = bedrock_runtime.invoke_agent(
+                    agentId=os.getenv("BEDROCK_AGENT_ID"),
+                    agentAliasId=os.getenv("BEDROCK_AGENT_ALIAS_ID"),
+                    sessionId=st.session_state.session_id,
+                    inputText=user_prompt
+                )
+
+                full_response = ""
+                for event in response.get('completion', []):
+                    if 'chunk' in event:
+                        full_response += event['chunk']['bytes'].decode('utf-8')
+                        response_placeholder.write(full_response.replace("R$", "R\\$") + "▌")
+                        time.sleep(0.01)
+
+                texto_final = full_response.replace("R$", "R\\$")
+                response_placeholder.write(texto_final)
+                
+                df = markdown_para_dataframe(full_response)
+                renderizar_grafico(df, user_prompt)
+
+                st.session_state.messages.append({
+                    "role": "assistant", "content": texto_final, 
+                    "dataframe": df, "pergunta": user_prompt
+                })
+                
+                salvar_sessao(st.session_state.session_id, st.session_state.messages)
+
+            except Exception as e:
+                response_placeholder.error("⚠️ O sistema está temporariamente indisponível.")
