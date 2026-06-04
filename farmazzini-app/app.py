@@ -18,7 +18,7 @@ BASE_DIR = os.path.dirname(__file__)
 caminho_logo = os.path.join(BASE_DIR, 'logo_farmazzini.png')
 caminho_logo_escuro = os.path.join(BASE_DIR, 'logo_farmazzini_dark.png') 
 caminho_mascote = os.path.join(BASE_DIR, 'mascote_farmazzini.png')
-ARQUIVO_HISTORICO = os.path.join(BASE_DIR, 'historico_pesquisas.json')
+caminho_avatar_usuario = os.path.join(BASE_DIR, 'avatar_usuario.png') # Nova imagem para o usuário
 
 # Função auxiliar para converter imagens em Base64 (remove o hover do Streamlit)
 def get_image_b64(caminho):
@@ -33,6 +33,7 @@ def get_image_b64(caminho):
 logo_b64 = get_image_b64(caminho_logo)
 logo_escuro_b64 = get_image_b64(caminho_logo_escuro)
 mascote_b64 = get_image_b64(caminho_mascote)
+avatar_usuario_b64 = get_image_b64(caminho_avatar_usuario)
 
 hora_atual = datetime.now().hour
 if hora_atual < 12:
@@ -167,12 +168,24 @@ estilo_escuro = """
     [data-testid="stChatInput"] button { background-color: transparent !important; }
     [data-testid="stChatInput"] svg { fill: white !important; }
     
-    /* CORREÇÃO DAS RESPOSTAS DO CHAT */
+    /* CORREÇÃO DAS RESPOSTAS DO CHAT (Assistente - Letras Brancas) */
     [data-testid="stChatMessageContent"] { color: #ffffff !important; }
     [data-testid="stChatMessageContent"] p, 
     [data-testid="stChatMessageContent"] div, 
     [data-testid="stChatMessageContent"] span,
     .stMarkdown, .stMarkdown p { color: #ffffff !important; }
+    
+    /* BUBBLE DO USUÁRIO NO MODO ESCURO (Fundo Branco, Letras Pretas) */
+    [data-testid="stChatMessage"]:has(.user-msg-marker) {
+        background-color: #ffffff !important;
+        border: 1px solid #e0e0e0 !important;
+    }
+    [data-testid="stChatMessage"]:has(.user-msg-marker) [data-testid="stChatMessageContent"],
+    [data-testid="stChatMessage"]:has(.user-msg-marker) p, 
+    [data-testid="stChatMessage"]:has(.user-msg-marker) div, 
+    [data-testid="stChatMessage"]:has(.user-msg-marker) span { 
+        color: #000000 !important; 
+    }
     
     /* CORREÇÃO DA PASTA "ABAS RECENTES" */
     [data-testid="stExpander"] { background-color: transparent !important; }
@@ -315,7 +328,6 @@ def renderizar_grafico(df, pergunta):
 
 # --- SIDEBAR (BARRA LATERAL) ---
 with st.sidebar:
-    # Lógica Imagem Base64 (Sem opção de clique/fullscreen)
     current_logo = logo_escuro_b64 if st.session_state.dark_mode and logo_escuro_b64 else logo_b64
     if current_logo:
         st.markdown(f'<img src="data:image/png;base64,{current_logo}" style="width:100%; pointer-events:none; margin-bottom: 15px;">', unsafe_allow_html=True)
@@ -347,7 +359,6 @@ with st.sidebar:
                 texto_botao = titulo_sessao if len(titulo_sessao) < 22 else titulo_sessao[:19] + "..."
                 chave_botao = sessao.get('data', str(uuid.uuid4()))
                 
-                # Layout com duas colunas: Chat e Apagar
                 col_chat, col_del = st.columns([8, 2])
                 with col_chat:
                     if st.button(f"💬 {texto_botao}", key=f"chat_{chave_botao}"):
@@ -364,14 +375,12 @@ with st.sidebar:
                     if st.button("❌", key=f"del_{chave_botao}"):
                         st.session_state.confirmar_delete = sessao_id
                 
-                # Bloco de confirmação de exclusão da aba
                 if st.session_state.confirmar_delete == sessao_id:
                     st.markdown("<div style='text-align:center; color:#d90429; font-weight:bold;'>Apagar conversa?</div>", unsafe_allow_html=True)
                     c1, c2 = st.columns(2)
                     if c1.button("Sim", key=f"yes_{chave_botao}", use_container_width=True):
                         deletar_sessao(sessao_id)
                         st.session_state.confirmar_delete = None
-                        # Se apagou a conversa atual, limpa a tela principal
                         if st.session_state.session_id == sessao_id:
                             st.session_state.session_id = str(uuid.uuid4())
                             st.session_state.messages = [{"role": "assistant", "content": f"{saudacao}! Eu sou o **Vacinini**..."}]
@@ -395,25 +404,30 @@ with col2:
     if mascote_b64:
         st.markdown(f'<img src="data:image/png;base64,{mascote_b64}" style="width:200px; pointer-events:none;">', unsafe_allow_html=True)
 
+# Define as variáveis de avatar para facilitar a renderização
+path_mascote = caminho_mascote if mascote_b64 else "💊"
+path_user = caminho_avatar_usuario if avatar_usuario_b64 else "👤"
+
 # Renderiza histórico de chat
 for msg in st.session_state.messages:
     if msg["role"] == "assistant":
-        avatar_path = caminho_mascote if mascote_b64 else "💊"
-        with st.chat_message("assistant", avatar=avatar_path):
+        with st.chat_message("assistant", avatar=path_mascote):
             st.write(msg["content"])
             if "dataframe" in msg and msg["dataframe"] is not None:
                 renderizar_grafico(msg["dataframe"], msg.get("pergunta", ""))
     else:
-        with st.chat_message("user"):
-            st.write(msg["content"])
+        with st.chat_message("user", avatar=path_user):
+            # A classe 'user-msg-marker' é o gatilho invisível para o CSS pintar o fundo de branco no dark mode
+            st.markdown(f"<div class='user-msg-marker'>{msg['content']}</div>", unsafe_allow_html=True)
 
 # Lógica de Input 
 if user_prompt := st.chat_input("Digite sua dúvida estratégica aqui..."):
     st.session_state.messages.append({"role": "user", "content": user_prompt})
-    with st.chat_message("user"): st.write(user_prompt)
+    
+    with st.chat_message("user", avatar=path_user):
+        st.markdown(f"<div class='user-msg-marker'>{user_prompt}</div>", unsafe_allow_html=True)
 
-    avatar_path = caminho_mascote if mascote_b64 else "💊"
-    with st.chat_message("assistant", avatar=avatar_path):
+    with st.chat_message("assistant", avatar=path_mascote):
         response_placeholder = st.empty()
         with st.spinner("Vacinini cruzando dados no Data Lake..."):
             try:
