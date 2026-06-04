@@ -21,7 +21,7 @@ caminho_mascote = os.path.join(BASE_DIR, 'mascote_farmazzini.png')
 caminho_avatar_usuario = os.path.join(BASE_DIR, 'avatar_usuario.png') 
 ARQUIVO_HISTORICO = os.path.join(BASE_DIR, 'historico_pesquisas.json') 
 
-# Função auxiliar para converter imagens em Base64 (remove o hover do Streamlit)
+# Função auxiliar para converter imagens em Base64
 def get_image_b64(caminho):
     if os.path.exists(caminho):
         try:
@@ -62,7 +62,6 @@ def renderizar_splash_screen():
     if "splash_mostrada" not in st.session_state:
         img_html = f'<img src="data:image/png;base64,{mascote_b64}" width="250" style="margin-bottom: 20px;">' if mascote_b64 else '<h1>💊 Farmazzini</h1>'
 
-        # Separando CSS em string normal para evitar erros de formatação
         css_splash = """
         <style>
         #splash-screen {
@@ -107,7 +106,7 @@ def renderizar_splash_screen():
 
 renderizar_splash_screen()
 
-# --- CSS CUSTOMIZADO (BASE + MODO ESCURO DINÂMICO) ---
+# --- CSS CUSTOMIZADO ---
 estilo_base = """
     <style>
     #MainMenu {visibility: hidden;}
@@ -161,15 +160,31 @@ estilo_escuro = """
         border-left: 5px solid #d90429 !important;
     }
     
+    /* CORREÇÃO DEFINITIVA DA BARRA DE DIGITAÇÃO NO MODO ESCURO */
     [data-testid="stBottomBlockContainer"] { background-color: #121212 !important; }
     [data-testid="stChatInput"] { background-color: #121212 !important; }
-    [data-testid="stChatInput"] > div { background-color: #2b2b2b !important; border: 1px solid #555 !important; }
-    [data-testid="stChatInput"] div { background-color: transparent !important; color: white !important; }
-    [data-testid="stChatInput"] textarea { background-color: transparent !important; color: white !important; }
-    [data-testid="stChatInput"] textarea::placeholder { color: #aaaaaa !important; }
+    
+    [data-testid="stChatInput"] [data-baseweb="textarea"] {
+        background-color: #2b2b2b !important;
+        border: 1px solid #555 !important;
+    }
+    
+    /* Força a cor do texto e do cursor (caret) a serem brancos */
+    [data-testid="stChatInput"] textarea { 
+        color: #ffffff !important; 
+        -webkit-text-fill-color: #ffffff !important;
+        caret-color: #ffffff !important;
+    }
+    
+    [data-testid="stChatInput"] textarea::placeholder { 
+        color: #aaaaaa !important; 
+        -webkit-text-fill-color: #aaaaaa !important;
+    }
+    
     [data-testid="stChatInput"] button { background-color: transparent !important; }
     [data-testid="stChatInput"] svg { fill: white !important; }
     
+    /* CORREÇÃO DO BALÃO DE RESPOSTA */
     [data-testid="stChatMessageContent"] { color: #ffffff !important; }
     [data-testid="stChatMessageContent"] p, 
     [data-testid="stChatMessageContent"] div, 
@@ -187,6 +202,7 @@ estilo_escuro = """
         color: #000000 !important; 
     }
     
+    /* CORREÇÃO DA PASTA "ABAS RECENTES" */
     [data-testid="stExpander"] { background-color: transparent !important; }
     [data-testid="stExpander"] details { background-color: transparent !important; border: none !important; }
     [data-testid="stExpander"] summary { background-color: transparent !important; color: #ffffff !important; }
@@ -229,6 +245,18 @@ def carregar_historico():
     try:
         with open(ARQUIVO_HISTORICO, 'r', encoding='utf-8') as f:
             historico = json.load(f)
+            
+        # SANITIZAÇÃO DE DADOS (Resolve o erro das abas fantasmas que não apagavam)
+        historico_modificado = False
+        for sessao in historico:
+            if 'session_id' not in sessao:
+                sessao['session_id'] = str(uuid.uuid4())
+                historico_modificado = True
+                
+        if historico_modificado:
+            with open(ARQUIVO_HISTORICO, 'w', encoding='utf-8') as f:
+                json.dump(historico, f, ensure_ascii=False, indent=4)
+
         limite_data = datetime.now() - timedelta(days=30)
         return [sessao for sessao in historico if datetime.fromisoformat(sessao['data']) >= limite_data]
     except: return []
@@ -262,6 +290,17 @@ def deletar_sessao(session_id):
     with open(ARQUIVO_HISTORICO, 'w', encoding='utf-8') as f:
         json.dump(historico[:50], f, ensure_ascii=False, indent=4)
 
+# CALLBACKS (Solução do Bug da Aba que não fechava)
+def confirmar_exclusao_aba(sessao_id):
+    deletar_sessao(sessao_id)
+    st.session_state.confirmar_delete = None
+    if st.session_state.session_id == sessao_id:
+        st.session_state.session_id = str(uuid.uuid4())
+        st.session_state.messages = [{"role": "assistant", "content": f"{saudacao}! Eu sou o **Vacinini**, o assistente virtual da **Farmazzini**. 💉\n\nEstou pronto para te ajudar a analisar os dados estratégicos de mercado. O que gostaria de consultar hoje?"}]
+
+def cancelar_exclusao_aba():
+    st.session_state.confirmar_delete = None
+
 if "session_id" not in st.session_state:
     st.session_state.session_id = str(uuid.uuid4())
 
@@ -290,36 +329,29 @@ def markdown_para_dataframe(texto):
         return None
         
     try:
-        # Refatorado: Substituição de linhas longas por loops simples e seguros
         linhas_dados = []
         for l in linhas_tabela:
-            # Ignora a linha de separadores (ex: |---|---|)
             if not re.match(r'^\s*\|[-|\s]+\|\s*$', l):
                 linhas_dados.append(l)
                 
-        if not linhas_dados:
-            return None
+        if not linhas_dados: return None
             
         colunas = [c.strip() for c in linhas_dados[0].split('|') if c.strip()]
-        
         dados = []
+        
         for l in linhas_dados[1:]:
             valores = [v.strip() for v in l.split('|') if v.strip()]
-            # Só adiciona a linha se tiver a mesma quantidade de colunas do cabeçalho
             if len(valores) == len(colunas):
                 dados.append(valores)
                 
-        if not dados: 
-            return None
+        if not dados: return None
             
         df = pd.DataFrame(dados, columns=colunas)
         
         for col in df.columns:
             df[col] = df[col].str.replace('R\\$', '').str.replace(',', '.').str.strip()
-            try: 
-                df[col] = pd.to_numeric(df[col])
-            except: 
-                pass
+            try: df[col] = pd.to_numeric(df[col])
+            except: pass
                 
         return df
     except: 
@@ -379,7 +411,7 @@ with st.sidebar:
             st.caption("Nenhuma pesquisa recente.")
         else:
             for sessao in historico_atual:
-                sessao_id = sessao.get('session_id', str(uuid.uuid4()))
+                sessao_id = sessao.get('session_id')
                 titulo_sessao = sessao.get('titulo', sessao.get('pergunta', 'Sessão Antiga'))
                 texto_botao = titulo_sessao if len(titulo_sessao) < 22 else titulo_sessao[:19] + "..."
                 chave_botao = sessao.get('data', str(uuid.uuid4()))
@@ -403,16 +435,8 @@ with st.sidebar:
                 if st.session_state.confirmar_delete == sessao_id:
                     st.markdown("<div style='text-align:center; color:#d90429; font-weight:bold;'>Apagar conversa?</div>", unsafe_allow_html=True)
                     c1, c2 = st.columns(2)
-                    if c1.button("Sim", key=f"yes_{chave_botao}", use_container_width=True):
-                        deletar_sessao(sessao_id)
-                        st.session_state.confirmar_delete = None
-                        if st.session_state.session_id == sessao_id:
-                            st.session_state.session_id = str(uuid.uuid4())
-                            st.session_state.messages = [{"role": "assistant", "content": f"{saudacao}! Eu sou o **Vacinini**..."}]
-                        st.rerun()
-                    if c2.button("Não", key=f"no_{chave_botao}", use_container_width=True):
-                        st.session_state.confirmar_delete = None
-                        st.rerun()
+                    c1.button("Sim", key=f"yes_{chave_botao}", use_container_width=True, on_click=confirmar_exclusao_aba, args=(sessao_id,))
+                    c2.button("Não", key=f"no_{chave_botao}", use_container_width=True, on_click=cancelar_exclusao_aba)
 
 # --- CORPO PRINCIPAL ---
 col1, col2 = st.columns([4, 1])
@@ -429,7 +453,6 @@ with col2:
     if mascote_b64:
         st.markdown(f'<img src="data:image/png;base64,{mascote_b64}" style="width:200px; pointer-events:none;">', unsafe_allow_html=True)
 
-# Define as variáveis de avatar para facilitar a renderização
 path_mascote = caminho_mascote if mascote_b64 else "💊"
 path_user = caminho_avatar_usuario if avatar_usuario_b64 else "👤"
 
