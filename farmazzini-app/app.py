@@ -177,6 +177,15 @@ estilo_escuro = """
     [data-testid="stChatInput"] button { background-color: transparent !important; }
     [data-testid="stChatInput"] svg { fill: white !important; }
     
+    /* CORREÇÃO DAS RESPOSTAS DO CHAT (FORÇA TEXTO BRANCO) */
+    [data-testid="stChatMessageContent"] { color: #ffffff !important; }
+    [data-testid="stChatMessageContent"] p, 
+    [data-testid="stChatMessageContent"] div, 
+    [data-testid="stChatMessageContent"] span,
+    .stMarkdown, .stMarkdown p { 
+        color: #ffffff !important; 
+    }
+    
     /* CORREÇÃO DA PASTA "ABAS RECENTES" (Apaga o fundo branco) */
     [data-testid="stExpander"] { background-color: transparent !important; }
     [data-testid="stExpander"] details { background-color: transparent !important; border: none !important; }
@@ -333,7 +342,6 @@ with st.sidebar:
         st.rerun() 
     st.markdown("---")
     
-    # Botão corrigido usando símbolo de texto "+" em vez de emoji
     if st.button("+ Nova Conversa", use_container_width=True, type="primary"):
         st.session_state.session_id = str(uuid.uuid4())
         st.session_state.messages = [{"role": "assistant", "content": f"Histórico limpo! **Vacinini** pronto para uma nova consulta."}]
