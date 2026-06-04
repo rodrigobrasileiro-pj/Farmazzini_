@@ -19,7 +19,7 @@ caminho_logo = os.path.join(BASE_DIR, 'logo_farmazzini.png')
 caminho_logo_escuro = os.path.join(BASE_DIR, 'logo_farmazzini_dark.png') 
 caminho_mascote = os.path.join(BASE_DIR, 'mascote_farmazzini.png')
 caminho_avatar_usuario = os.path.join(BASE_DIR, 'avatar_usuario.png') 
-ARQUIVO_HISTORICO = os.path.join(BASE_DIR, 'historico_pesquisas.json') # <-- A linha que eu tinha apagado sem querer!
+ARQUIVO_HISTORICO = os.path.join(BASE_DIR, 'historico_pesquisas.json') 
 
 # Função auxiliar para converter imagens em Base64 (remove o hover do Streamlit)
 def get_image_b64(caminho):
@@ -62,30 +62,237 @@ def renderizar_splash_screen():
     if "splash_mostrada" not in st.session_state:
         img_html = f'<img src="data:image/png;base64,{mascote_b64}" width="250" style="margin-bottom: 20px;">' if mascote_b64 else '<h1>💊 Farmazzini</h1>'
 
-        splash_html = f"""
+        # Separando CSS em string normal para evitar SyntaxError com chaves
+        css_splash = """
         <style>
-        #splash-screen {{
+        #splash-screen {
             position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
             background-color: white; z-index: 999999;
             display: flex; flex-direction: column; align-items: center; justify-content: center;
             animation: fadeOut 0.5s ease 2.5s forwards;
-        }}
-        @keyframes fadeOut {{
-            to {{ opacity: 0; visibility: hidden; z-index: -1; }}
-        }}
-        .loading-bar-container {{
+        }
+        @keyframes fadeOut {
+            to { opacity: 0; visibility: hidden; z-index: -1; }
+        }
+        .loading-bar-container {
             width: 300px; height: 8px; background-color: #f0f0f0; border-radius: 4px; overflow: hidden;
             box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
-        }}
-        .loading-bar {{
+        }
+        .loading-bar {
             height: 100%; background-color: #d90429; width: 0%;
             animation: loadProgress 2s ease-in-out forwards;
-        }}
-        @keyframes loadProgress {{
-            0% {{ width: 0%; }}
-            50% {{ width: 70%; }}
-            100% {{ width: 100%; }}
-        }}
-        [data-testid="stAppViewBlockContainer"] {{ animation: delayShow 2.5s; }}
-        @keyframes delayShow {{ from {{ opacity: 0; }} to {{ opacity: 1; }} }}
-        </style
+        }
+        @keyframes loadProgress {
+            0% { width: 0%; }
+            50% { width: 70%; }
+            100% { width: 100%; }
+        }
+        [data-testid="stAppViewBlockContainer"] { animation: delayShow 2.5s; }
+        @keyframes delayShow { from { opacity: 0; } to { opacity: 1; } }
+        </style>
+        """
+        
+        # HTML usando f-string de forma segura
+        html_splash = f"""
+        <div id="splash-screen">
+            {img_html}
+            <div style="font-family: sans-serif; color: #555; margin-bottom: 15px; font-weight: bold; letter-spacing: 1px;">
+                INICIALIZANDO CENTRAL DE INTELIGÊNCIA...
+            </div>
+            <div class="loading-bar-container"><div class="loading-bar"></div></div>
+        </div>
+        """
+        
+        st.markdown(css_splash + html_splash, unsafe_allow_html=True)
+        st.session_state.splash_mostrada = True
+
+renderizar_splash_screen()
+
+# --- CSS CUSTOMIZADO (BASE + MODO ESCURO DINÂMICO) ---
+estilo_base = """
+    <style>
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    
+    /* Botões Padrão da Sidebar (Histórico) */
+    [data-testid="stSidebar"] .stButton>button[kind="secondary"] {
+        width: 100%; border-radius: 8px; text-align: left; border: 1px solid transparent;
+        background-color: transparent; color: inherit; padding: 10px 15px;
+        justify-content: flex-start; transition: all 0.2s ease-in-out;
+    }
+    [data-testid="stSidebar"] .stButton>button[kind="secondary"]:hover {
+        border: 1px solid #d90429; color: #d90429;
+    }
+    
+    /* Botão Destaque: NOVA CONVERSA */
+    [data-testid="stSidebar"] button[kind="primary"] {
+        background-color: #d90429 !important;
+        color: white !important;
+        border-radius: 8px !important;
+        border: none !important;
+        font-weight: bold !important;
+        padding: 12px 20px !important;
+        transition: all 0.3s ease !important;
+    }
+    [data-testid="stSidebar"] button[kind="primary"]:hover {
+        background-color: #b00322 !important;
+        box-shadow: 0 4px 8px rgba(217, 4, 41, 0.3) !important;
+    }
+    
+    /* Estilo da "Pasta" do Expander */
+    [data-testid="stExpander"] { border: none !important; background-color: transparent !important; }
+    [data-testid="stExpander"] details { border: none !important; background-color: transparent !important; }
+    [data-testid="stExpander"] summary { background-color: transparent !important; padding-left: 0 !important; }
+    [data-testid="stExpander"] summary p { font-weight: bold; font-size: 16px; }
+    
+    .highlight-box {
+        background-color: #f8f9fa; padding: 20px; border-radius: 12px;
+        border-left: 5px solid #d90429; margin-bottom: 25px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05); color: black;
+    }
+    </style>
+"""
+
+estilo_escuro = """
+    <style>
+    .stApp { background-color: #121212; color: #ffffff; }
+    [data-testid="stHeader"] { background-color: transparent; }
+    [data-testid="stSidebar"] { background-color: #1e1e1e; }
+    
+    .highlight-box {
+        background-color: #2b2b2b !important; 
+        color: #ffffff !important; 
+        border-left: 5px solid #d90429 !important;
+    }
+    
+    /* CORREÇÃO DA BARRA DE DIGITAÇÃO */
+    [data-testid="stBottomBlockContainer"] { background-color: #121212 !important; }
+    [data-testid="stChatInput"] { background-color: #121212 !important; }
+    [data-testid="stChatInput"] > div { background-color: #2b2b2b !important; border: 1px solid #555 !important; }
+    [data-testid="stChatInput"] div { background-color: transparent !important; color: white !important; }
+    [data-testid="stChatInput"] textarea { background-color: transparent !important; color: white !important; }
+    [data-testid="stChatInput"] textarea::placeholder { color: #aaaaaa !important; }
+    [data-testid="stChatInput"] button { background-color: transparent !important; }
+    [data-testid="stChatInput"] svg { fill: white !important; }
+    
+    /* CORREÇÃO DAS RESPOSTAS DO CHAT (Assistente - Letras Brancas) */
+    [data-testid="stChatMessageContent"] { color: #ffffff !important; }
+    [data-testid="stChatMessageContent"] p, 
+    [data-testid="stChatMessageContent"] div, 
+    [data-testid="stChatMessageContent"] span,
+    .stMarkdown, .stMarkdown p { color: #ffffff !important; }
+    
+    /* BUBBLE DO USUÁRIO NO MODO ESCURO (Fundo Branco, Letras Pretas) */
+    [data-testid="stChatMessage"]:has(.user-msg-marker) {
+        background-color: #ffffff !important;
+        border: 1px solid #e0e0e0 !important;
+    }
+    [data-testid="stChatMessage"]:has(.user-msg-marker) [data-testid="stChatMessageContent"],
+    [data-testid="stChatMessage"]:has(.user-msg-marker) p, 
+    [data-testid="stChatMessage"]:has(.user-msg-marker) div, 
+    [data-testid="stChatMessage"]:has(.user-msg-marker) span { 
+        color: #000000 !important; 
+    }
+    
+    /* CORREÇÃO DA PASTA "ABAS RECENTES" */
+    [data-testid="stExpander"] { background-color: transparent !important; }
+    [data-testid="stExpander"] details { background-color: transparent !important; border: none !important; }
+    [data-testid="stExpander"] summary { background-color: transparent !important; color: #ffffff !important; }
+    [data-testid="stExpander"] summary:hover { background-color: #2b2b2b !important; }
+    [data-testid="stExpander"] summary p, 
+    [data-testid="stExpander"] summary span, 
+    [data-testid="stExpander"] svg { color: #ffffff !important; fill: #ffffff !important; }
+    
+    h1, h2, h3, h4, h5, h6, p, span { color: #ffffff; }
+    </style>
+"""
+
+st.markdown(estilo_base, unsafe_allow_html=True)
+if st.session_state.dark_mode:
+    st.markdown(estilo_escuro, unsafe_allow_html=True)
+
+# --- FUNÇÕES DE HISTÓRICO COM MEMÓRIA COMPLETA ---
+def serializar_mensagens(mensagens):
+    msgs_salvas = []
+    for m in mensagens:
+        nova_m = {"role": m["role"], "content": m["content"]}
+        if "pergunta" in m: nova_m["pergunta"] = m["pergunta"]
+        if "dataframe" in m and m["dataframe"] is not None:
+            nova_m["dataframe"] = m["dataframe"].fillna("").to_dict(orient="records")
+        msgs_salvas.append(nova_m)
+    return msgs_salvas
+
+def desserializar_mensagens(mensagens_salvas):
+    msgs = []
+    for m in mensagens_salvas:
+        nova_m = {"role": m["role"], "content": m["content"]}
+        if "pergunta" in m: nova_m["pergunta"] = m["pergunta"]
+        if "dataframe" in m and m["dataframe"]:
+            nova_m["dataframe"] = pd.DataFrame(m["dataframe"])
+        msgs.append(nova_m)
+    return msgs
+
+def carregar_historico():
+    if not os.path.exists(ARQUIVO_HISTORICO): return []
+    try:
+        with open(ARQUIVO_HISTORICO, 'r', encoding='utf-8') as f:
+            historico = json.load(f)
+        limite_data = datetime.now() - timedelta(days=30)
+        return [sessao for sessao in historico if datetime.fromisoformat(sessao['data']) >= limite_data]
+    except: return []
+
+def salvar_sessao(session_id, mensagens):
+    if len(mensagens) <= 1: return 
+    
+    titulo = "Nova Conversa"
+    for m in mensagens:
+        if m["role"] == "user":
+            titulo = m["content"]
+            break
+
+    historico = carregar_historico()
+    historico = [h for h in historico if h.get("session_id") != session_id]
+    
+    nova_sessao = {
+        "session_id": session_id,
+        "titulo": titulo,
+        "data": datetime.now().isoformat(),
+        "messages": serializar_mensagens(mensagens)
+    }
+    historico.insert(0, nova_sessao)
+    
+    with open(ARQUIVO_HISTORICO, 'w', encoding='utf-8') as f:
+        json.dump(historico[:50], f, ensure_ascii=False, indent=4)
+
+def deletar_sessao(session_id):
+    historico = carregar_historico()
+    historico = [h for h in historico if h.get("session_id") != session_id]
+    with open(ARQUIVO_HISTORICO, 'w', encoding='utf-8') as f:
+        json.dump(historico[:50], f, ensure_ascii=False, indent=4)
+
+if "session_id" not in st.session_state:
+    st.session_state.session_id = str(uuid.uuid4())
+
+if "messages" not in st.session_state:
+    st.session_state.messages = [
+        {"role": "assistant", "content": f"{saudacao}! Eu sou o **Vacinini**, o assistente virtual da **Farmazzini**. 💉\n\nEstou pronto para te ajudar a analisar os dados estratégicos de mercado. O que gostaria de consultar hoje?"}
+    ]
+
+# --- CONEXÃO AWS BEDROCK ---
+try:
+    bedrock_runtime = boto3.client(
+        'bedrock-agent-runtime',
+        aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
+        aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
+        region_name=os.getenv("AWS_DEFAULT_REGION", "us-east-2")
+    )
+except Exception as e:
+    st.error(f"⚠️ Erro de conexão com a nuvem: {e}")
+
+# --- FUNÇÕES DE DADOS E GRÁFICOS ---
+def markdown_para_dataframe(texto):
+    linhas = texto.strip().split('\n')
+    linhas_tabela = [l for l in linhas if '|' in l]
+    if len(linhas_tabela) < 3: return None
+    try:
+        linhas_dados = [l for l in linhas_tabela if not re.match
