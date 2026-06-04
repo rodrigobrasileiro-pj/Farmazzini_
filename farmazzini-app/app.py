@@ -164,16 +164,20 @@ estilo_escuro = """
     [data-testid="stBottomBlockContainer"] { background-color: #121212 !important; }
     [data-testid="stChatInput"] { background-color: #121212 !important; }
     
-    [data-testid="stChatInput"] [data-baseweb="textarea"] {
+    [data-testid="stChatInput"] > div {
         background-color: #2b2b2b !important;
         border: 1px solid #555 !important;
     }
     
-    /* Força a cor do texto e do cursor (caret) a serem brancos */
+    [data-baseweb="textarea"], [data-baseweb="base-input"] {
+        background-color: transparent !important;
+    }
+    
     [data-testid="stChatInput"] textarea { 
         color: #ffffff !important; 
         -webkit-text-fill-color: #ffffff !important;
         caret-color: #ffffff !important;
+        background-color: transparent !important;
     }
     
     [data-testid="stChatInput"] textarea::placeholder { 
@@ -182,7 +186,7 @@ estilo_escuro = """
     }
     
     [data-testid="stChatInput"] button { background-color: transparent !important; }
-    [data-testid="stChatInput"] svg { fill: white !important; }
+    [data-testid="stChatInput"] svg { fill: #ffffff !important; }
     
     /* CORREÇÃO DO BALÃO DE RESPOSTA */
     [data-testid="stChatMessageContent"] { color: #ffffff !important; }
@@ -191,15 +195,17 @@ estilo_escuro = """
     [data-testid="stChatMessageContent"] span,
     .stMarkdown, .stMarkdown p { color: #ffffff !important; }
     
+    /* BUBBLE DO USUÁRIO NO MODO ESCURO (Mesmo fundo do Dicas de Análise) */
     [data-testid="stChatMessage"]:has(.user-msg-marker) {
-        background-color: #ffffff !important;
-        border: 1px solid #e0e0e0 !important;
+        background-color: #2b2b2b !important;
+        border: 1px solid #555 !important;
     }
     [data-testid="stChatMessage"]:has(.user-msg-marker) [data-testid="stChatMessageContent"],
     [data-testid="stChatMessage"]:has(.user-msg-marker) p, 
     [data-testid="stChatMessage"]:has(.user-msg-marker) div, 
     [data-testid="stChatMessage"]:has(.user-msg-marker) span { 
-        color: #000000 !important; 
+        color: #ffffff !important; 
+        -webkit-text-fill-color: #ffffff !important;
     }
     
     /* CORREÇÃO DA PASTA "ABAS RECENTES" */
@@ -246,7 +252,7 @@ def carregar_historico():
         with open(ARQUIVO_HISTORICO, 'r', encoding='utf-8') as f:
             historico = json.load(f)
             
-        # SANITIZAÇÃO DE DADOS (Resolve o erro das abas fantasmas que não apagavam)
+        # SANITIZAÇÃO DE DADOS 
         historico_modificado = False
         for sessao in historico:
             if 'session_id' not in sessao:
@@ -290,7 +296,7 @@ def deletar_sessao(session_id):
     with open(ARQUIVO_HISTORICO, 'w', encoding='utf-8') as f:
         json.dump(historico[:50], f, ensure_ascii=False, indent=4)
 
-# CALLBACKS (Solução do Bug da Aba que não fechava)
+# CALLBACKS 
 def confirmar_exclusao_aba(sessao_id):
     deletar_sessao(sessao_id)
     st.session_state.confirmar_delete = None
