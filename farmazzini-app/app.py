@@ -10,7 +10,6 @@ import pandas as pd
 import plotly.express as px
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
-from PIL import Image
 
 load_dotenv()
 
@@ -21,20 +20,19 @@ caminho_logo_escuro = os.path.join(BASE_DIR, 'logo_farmazzini_dark.png')
 caminho_mascote = os.path.join(BASE_DIR, 'mascote_farmazzini.png')
 ARQUIVO_HISTORICO = os.path.join(BASE_DIR, 'historico_pesquisas.json')
 
-try:
-    img_logo_completa = Image.open(caminho_logo)
-except Exception:
-    img_logo_completa = None
+# Função auxiliar para converter imagens em Base64 (remove o hover do Streamlit)
+def get_image_b64(caminho):
+    if os.path.exists(caminho):
+        try:
+            with open(caminho, "rb") as f:
+                return base64.b64encode(f.read()).decode()
+        except:
+            return None
+    return None
 
-try:
-    img_logo_escuro = Image.open(caminho_logo_escuro)
-except Exception:
-    img_logo_escuro = None
-
-try:
-    img_mascote = Image.open(caminho_mascote)
-except Exception:
-    img_mascote = None
+logo_b64 = get_image_b64(caminho_logo)
+logo_escuro_b64 = get_image_b64(caminho_logo_escuro)
+mascote_b64 = get_image_b64(caminho_mascote)
 
 hora_atual = datetime.now().hour
 if hora_atual < 12:
@@ -46,25 +44,21 @@ else:
 
 st.set_page_config(
     page_title="Central de Inteligência Farmazzini",
-    page_icon=img_mascote if img_mascote else "💊",
+    page_icon="💊",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Inicializa variável de Modo Escuro na Sessão
+# Inicializa variáveis de Sessão
 if "dark_mode" not in st.session_state:
     st.session_state.dark_mode = False
+if "confirmar_delete" not in st.session_state:
+    st.session_state.confirmar_delete = None
 
 # --- TELA DE CARREGAMENTO (SPLASH SCREEN) ---
 def renderizar_splash_screen():
     if "splash_mostrada" not in st.session_state:
-        img_b64 = ""
-        try:
-            with open(caminho_mascote, "rb") as f:
-                img_b64 = base64.b64encode(f.read()).decode()
-        except: pass
-
-        img_html = f'<img src="data:image/png;base64,{img_b64}" width="250" style="margin-bottom: 20px;">' if img_b64 else '<h1>💊 Farmazzini</h1>'
+        img_html = f'<img src="data:image/png;base64,{mascote_b64}" width="250" style="margin-bottom: 20px;">' if mascote_b64 else '<h1>💊 Farmazzini</h1>'
 
         splash_html = f"""
         <style>
@@ -137,7 +131,7 @@ estilo_base = """
         box-shadow: 0 4px 8px rgba(217, 4, 41, 0.3) !important;
     }
     
-    /* Estilo da "Pasta" do Expander (Limpeza Base) */
+    /* Estilo da "Pasta" do Expander */
     [data-testid="stExpander"] { border: none !important; background-color: transparent !important; }
     [data-testid="stExpander"] details { border: none !important; background-color: transparent !important; }
     [data-testid="stExpander"] summary { background-color: transparent !important; padding-left: 0 !important; }
@@ -153,7 +147,6 @@ estilo_base = """
 
 estilo_escuro = """
     <style>
-    /* Sobrescrita para Modo Escuro */
     .stApp { background-color: #121212; color: #ffffff; }
     [data-testid="stHeader"] { background-color: transparent; }
     [data-testid="stSidebar"] { background-color: #1e1e1e; }
@@ -167,50 +160,38 @@ estilo_escuro = """
     /* CORREÇÃO DA BARRA DE DIGITAÇÃO */
     [data-testid="stBottomBlockContainer"] { background-color: #121212 !important; }
     [data-testid="stChatInput"] { background-color: #121212 !important; }
-    
     [data-testid="stChatInput"] > div { background-color: #2b2b2b !important; border: 1px solid #555 !important; }
     [data-testid="stChatInput"] div { background-color: transparent !important; color: white !important; }
-    
     [data-testid="stChatInput"] textarea { background-color: transparent !important; color: white !important; }
     [data-testid="stChatInput"] textarea::placeholder { color: #aaaaaa !important; }
-    
     [data-testid="stChatInput"] button { background-color: transparent !important; }
     [data-testid="stChatInput"] svg { fill: white !important; }
     
-    /* CORREÇÃO DAS RESPOSTAS DO CHAT (FORÇA TEXTO BRANCO) */
+    /* CORREÇÃO DAS RESPOSTAS DO CHAT */
     [data-testid="stChatMessageContent"] { color: #ffffff !important; }
     [data-testid="stChatMessageContent"] p, 
     [data-testid="stChatMessageContent"] div, 
     [data-testid="stChatMessageContent"] span,
-    .stMarkdown, .stMarkdown p { 
-        color: #ffffff !important; 
-    }
+    .stMarkdown, .stMarkdown p { color: #ffffff !important; }
     
-    /* CORREÇÃO DA PASTA "ABAS RECENTES" (Apaga o fundo branco) */
+    /* CORREÇÃO DA PASTA "ABAS RECENTES" */
     [data-testid="stExpander"] { background-color: transparent !important; }
     [data-testid="stExpander"] details { background-color: transparent !important; border: none !important; }
     [data-testid="stExpander"] summary { background-color: transparent !important; color: #ffffff !important; }
     [data-testid="stExpander"] summary:hover { background-color: #2b2b2b !important; }
-    
-    /* Força o título da "Pasta" e o ícone a ficarem brancos */
     [data-testid="stExpander"] summary p, 
     [data-testid="stExpander"] summary span, 
-    [data-testid="stExpander"] svg {
-        color: #ffffff !important;
-        fill: #ffffff !important;
-    }
+    [data-testid="stExpander"] svg { color: #ffffff !important; fill: #ffffff !important; }
     
-    /* Textos Gerais */
     h1, h2, h3, h4, h5, h6, p, span { color: #ffffff; }
     </style>
 """
 
-# Aplica o CSS Base e, se o toggle estiver ativo, aplica o CSS Escuro por cima
 st.markdown(estilo_base, unsafe_allow_html=True)
 if st.session_state.dark_mode:
     st.markdown(estilo_escuro, unsafe_allow_html=True)
 
-# --- FUNÇÕES DE HISTÓRICO COM MEMÓRIA COMPLETA (SESSÕES) ---
+# --- FUNÇÕES DE HISTÓRICO COM MEMÓRIA COMPLETA ---
 def serializar_mensagens(mensagens):
     msgs_salvas = []
     for m in mensagens:
@@ -260,6 +241,12 @@ def salvar_sessao(session_id, mensagens):
     }
     historico.insert(0, nova_sessao)
     
+    with open(ARQUIVO_HISTORICO, 'w', encoding='utf-8') as f:
+        json.dump(historico[:50], f, ensure_ascii=False, indent=4)
+
+def deletar_sessao(session_id):
+    historico = carregar_historico()
+    historico = [h for h in historico if h.get("session_id") != session_id]
     with open(ARQUIVO_HISTORICO, 'w', encoding='utf-8') as f:
         json.dump(historico[:50], f, ensure_ascii=False, indent=4)
 
@@ -328,10 +315,10 @@ def renderizar_grafico(df, pergunta):
 
 # --- SIDEBAR (BARRA LATERAL) ---
 with st.sidebar:
-    if st.session_state.dark_mode and img_logo_escuro:
-        st.image(img_logo_escuro, use_container_width=True)
-    elif img_logo_completa:
-        st.image(img_logo_completa, use_container_width=True)
+    # Lógica Imagem Base64 (Sem opção de clique/fullscreen)
+    current_logo = logo_escuro_b64 if st.session_state.dark_mode and logo_escuro_b64 else logo_b64
+    if current_logo:
+        st.markdown(f'<img src="data:image/png;base64,{current_logo}" style="width:100%; pointer-events:none; margin-bottom: 15px;">', unsafe_allow_html=True)
     else:
         st.title("💊 FARMAZZINI")
     
@@ -355,21 +342,43 @@ with st.sidebar:
             st.caption("Nenhuma pesquisa recente.")
         else:
             for sessao in historico_atual:
+                sessao_id = sessao.get('session_id', str(uuid.uuid4()))
                 titulo_sessao = sessao.get('titulo', sessao.get('pergunta', 'Sessão Antiga'))
-                texto_botao = titulo_sessao if len(titulo_sessao) < 28 else titulo_sessao[:25] + "..."
+                texto_botao = titulo_sessao if len(titulo_sessao) < 22 else titulo_sessao[:19] + "..."
                 chave_botao = sessao.get('data', str(uuid.uuid4()))
                 
-                if st.button(f"💬 {texto_botao}", key=chave_botao):
-                    st.session_state.session_id = sessao.get('session_id', str(uuid.uuid4()))
-                    
-                    if 'messages' in sessao:
-                        st.session_state.messages = desserializar_mensagens(sessao['messages'])
-                    else:
-                        st.session_state.messages = [
-                            {"role": "assistant", "content": "A recuperar formato de pesquisa antiga..."},
-                            {"role": "user", "content": titulo_sessao}
-                        ]
-                    st.rerun()
+                # Layout com duas colunas: Chat e Apagar
+                col_chat, col_del = st.columns([8, 2])
+                with col_chat:
+                    if st.button(f"💬 {texto_botao}", key=f"chat_{chave_botao}"):
+                        st.session_state.session_id = sessao_id
+                        if 'messages' in sessao:
+                            st.session_state.messages = desserializar_mensagens(sessao['messages'])
+                        else:
+                            st.session_state.messages = [
+                                {"role": "assistant", "content": "A recuperar formato de pesquisa antiga..."},
+                                {"role": "user", "content": titulo_sessao}
+                            ]
+                        st.rerun()
+                with col_del:
+                    if st.button("❌", key=f"del_{chave_botao}"):
+                        st.session_state.confirmar_delete = sessao_id
+                
+                # Bloco de confirmação de exclusão da aba
+                if st.session_state.confirmar_delete == sessao_id:
+                    st.markdown("<div style='text-align:center; color:#d90429; font-weight:bold;'>Apagar conversa?</div>", unsafe_allow_html=True)
+                    c1, c2 = st.columns(2)
+                    if c1.button("Sim", key=f"yes_{chave_botao}", use_container_width=True):
+                        deletar_sessao(sessao_id)
+                        st.session_state.confirmar_delete = None
+                        # Se apagou a conversa atual, limpa a tela principal
+                        if st.session_state.session_id == sessao_id:
+                            st.session_state.session_id = str(uuid.uuid4())
+                            st.session_state.messages = [{"role": "assistant", "content": f"{saudacao}! Eu sou o **Vacinini**..."}]
+                        st.rerun()
+                    if c2.button("Não", key=f"no_{chave_botao}", use_container_width=True):
+                        st.session_state.confirmar_delete = None
+                        st.rerun()
 
 # --- CORPO PRINCIPAL ---
 col1, col2 = st.columns([4, 1])
@@ -379,16 +388,18 @@ with col1:
     <div class="highlight-box">
         <strong>💡 Dicas de análise:</strong><br>
         • <i>"Qual o preço médio do Omeprazol na Vera Cruz?"</i><br>
-        • <i>"Me mostre um comparativo de preços dos remédios mais vendidos."</i><br>
+        • <i>"Gere um gráfico comparativo de preços da Dipirona por farmácia."</i><br>
     </div>
     """, unsafe_allow_html=True)
 with col2:
-    if img_mascote: st.image(img_mascote, width=200)
+    if mascote_b64:
+        st.markdown(f'<img src="data:image/png;base64,{mascote_b64}" style="width:200px; pointer-events:none;">', unsafe_allow_html=True)
 
 # Renderiza histórico de chat
 for msg in st.session_state.messages:
     if msg["role"] == "assistant":
-        with st.chat_message("assistant", avatar=caminho_mascote if img_mascote else "💊"):
+        avatar_path = caminho_mascote if mascote_b64 else "💊"
+        with st.chat_message("assistant", avatar=avatar_path):
             st.write(msg["content"])
             if "dataframe" in msg and msg["dataframe"] is not None:
                 renderizar_grafico(msg["dataframe"], msg.get("pergunta", ""))
@@ -401,7 +412,8 @@ if user_prompt := st.chat_input("Digite sua dúvida estratégica aqui..."):
     st.session_state.messages.append({"role": "user", "content": user_prompt})
     with st.chat_message("user"): st.write(user_prompt)
 
-    with st.chat_message("assistant", avatar=caminho_mascote if img_mascote else "💊"):
+    avatar_path = caminho_mascote if mascote_b64 else "💊"
+    with st.chat_message("assistant", avatar=avatar_path):
         response_placeholder = st.empty()
         with st.spinner("Vacinini cruzando dados no Data Lake..."):
             try:
